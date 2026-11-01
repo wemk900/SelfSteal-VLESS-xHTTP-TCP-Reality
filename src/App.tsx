@@ -54,7 +54,8 @@ const DEFAULT_CONFIG: SelfStealConfig = {
 export default function App() {
   const [config, setConfig] = useState<SelfStealConfig>(DEFAULT_CONFIG);
   const [activeTab, setActiveTab] = useState<ActiveTab>('bash');
-  const [uriCopied, setUriCopied] = useState(false);
+  const [githubRepo, setGithubRepo] = useState('YOUR_USERNAME/selfsteal');
+  const [oneLinerCopied, setOneLinerCopied] = useState<'process' | 'pipe' | null>(null);
 
   const validation = useMemo(() => validateConfig(config), [config]);
   const baseDir = getBaseDirectory(config.webServer);
@@ -93,11 +94,17 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  const handleCopyUri = async () => {
+  const cleanRepo = githubRepo.trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '') || 'YOUR_USERNAME/selfsteal';
+  const rawScriptUrl = `https://raw.githubusercontent.com/${cleanRepo}/main/install-selfsteal.sh`;
+  const bashProcessOneLiner = `sudo bash <(curl -fsSL ${rawScriptUrl})`;
+  const bashPipeOneLiner = `curl -fsSL ${rawScriptUrl} | sudo bash`;
+
+  const handleCopyOneLiner = async (type: 'process' | 'pipe') => {
+    const text = type === 'process' ? bashProcessOneLiner : bashPipeOneLiner;
     try {
-      await navigator.clipboard.writeText(vlessUri);
-      setUriCopied(true);
-      setTimeout(() => setUriCopied(false), 1800);
+      await navigator.clipboard.writeText(text);
+      setOneLinerCopied(type);
+      setTimeout(() => setOneLinerCopied(null), 1800);
     } catch {
       // Fallback
     }
@@ -184,14 +191,28 @@ export default function App() {
           </a>
         </nav>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => handleCopyOneLiner('process')}
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-950 bg-sky-400 hover:bg-sky-300 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            {oneLinerCopied === 'process' ? (
+              <Check className="w-3.5 h-3.5" />
+            ) : (
+              <Copy className="w-3.5 h-3.5" />
+            )}
+            <span>
+              {oneLinerCopied === 'process' ? 'Скопирована команда bash <(curl)' : 'Скопировать bash <(curl)'}
+            </span>
+          </button>
           <button
             type="button"
             onClick={handleDownloadBashScript}
-            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-950 bg-sky-400 hover:bg-sky-300 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-200 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Скачать install-selfsteal.sh</span>
+            <span>.sh файл</span>
           </button>
         </div>
       </header>
@@ -369,23 +390,79 @@ export default function App() {
             {/* TAB 1: BASH INSTALL SCRIPT */}
             {activeTab === 'bash' && (
               <div className="space-y-5">
-                <div className="border border-slate-800 rounded-lg bg-slate-900/60 p-4 space-y-2">
-                  <div className="text-xs font-semibold text-slate-200">
-                    Запуск на сервере (Ubuntu / Debian)
+                <div className="border border-slate-800 rounded-lg bg-slate-900/70 p-4 space-y-3.5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-semibold text-slate-100">
+                        Запуск одной командой через Bash (из GitHub Raw без скачивания)
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Все вопросы скрипта читают ввод через <span className="font-mono text-slate-300">/dev/tty</span>, поэтому интерактивный диалог работает напрямую через <span className="font-mono text-slate-300">bash &lt;(curl ...)</span> и <span className="font-mono text-slate-300">curl | sudo bash</span>.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label htmlFor="github-repo-input" className="text-xs text-slate-400 whitespace-nowrap">
+                        Ваш GitHub (user/repo):
+                      </label>
+                      <input
+                        id="github-repo-input"
+                        type="text"
+                        value={githubRepo}
+                        onChange={(e) => setGithubRepo(e.target.value)}
+                        placeholder="YOUR_USERNAME/selfsteal"
+                        className="px-2.5 py-1 text-xs font-mono bg-slate-950 border border-slate-800 focus:border-sky-400 focus:outline-none rounded text-slate-100 w-52"
+                      />
+                    </div>
                   </div>
-                  <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded bg-slate-950 border border-slate-800 font-mono text-xs text-sky-300">
-                    <span className="select-all">
-                      nano install-selfsteal.sh &amp;&amp; chmod +x install-selfsteal.sh &amp;&amp; sudo ./install-selfsteal.sh
-                    </span>
+
+                  {/* Вариант 1: bash <(curl -fsSL ...) */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-400">Вариант 1 (рекомендуемый — через подстановку процесса Bash):</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyOneLiner('process')}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded transition-colors cursor-pointer"
+                      >
+                        {oneLinerCopied === 'process' ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5 text-slate-400" />
+                        )}
+                        <span>{oneLinerCopied === 'process' ? 'Скопировано' : 'Копировать'}</span>
+                      </button>
+                    </div>
+                    <div className="p-2.5 rounded bg-slate-950 border border-slate-800 font-mono text-xs text-sky-300 select-all break-all">
+                      {bashProcessOneLiner}
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-400">
-                    При запуске скрипт интерактивно спросит: 1) Caddy/Nginx, 2) Домен, 3) XHTTP (и путь вида <span className="font-mono text-slate-300">{config.domain}{normPath}</span>) или TCP, 4) Порт Target (<span className="font-mono text-slate-300">{fullTarget}</span> по умолчанию), а если просто нажимать Enter — подставит выбранные вами значения.
-                  </p>
+
+                  {/* Вариант 2: curl -fsSL ... | sudo bash */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-400">Вариант 2 (классический пайп curl | sudo bash):</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyOneLiner('pipe')}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded transition-colors cursor-pointer"
+                      >
+                        {oneLinerCopied === 'pipe' ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5 text-slate-400" />
+                        )}
+                        <span>{oneLinerCopied === 'pipe' ? 'Скопировано' : 'Копировать'}</span>
+                      </button>
+                    </div>
+                    <div className="p-2.5 rounded bg-slate-950 border border-slate-800 font-mono text-xs text-emerald-300 select-all break-all">
+                      {bashPipeOneLiner}
+                    </div>
+                  </div>
                 </div>
 
                 <CodeBlock
-                  title="install-selfsteal.sh — Полный Bash-скрипт установки SelfSteal"
-                  subtitle={`Автоустановка ${config.webServer.toUpperCase()} в ${baseDir} + Let's Encrypt Cron + Логирование`}
+                  title="install-selfsteal.sh — Исходный код скрипта для вашего GitHub репозитория"
+                  subtitle={`Положите этот файл в корень GitHub репозитория (уже сохранен в /install-selfsteal.sh)`}
                   code={bashScript}
                   filename="install-selfsteal.sh"
                   maxHeight="max-h-[620px]"

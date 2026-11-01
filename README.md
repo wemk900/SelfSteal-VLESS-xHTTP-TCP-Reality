@@ -119,10 +119,18 @@ root@vps:~# selfssteal status
 
 ---
 
-## Быстрый старт (Установка на VPS)
+## Быстрый старт (Установка одной командой без скачивания)
+
+Скрипт поддерживает интерактивный опрос через `/dev/tty`, поэтому его можно запускать **напрямую из GitHub одной строкой** без предварительного скачивания файла:
 
 ```bash
-nano install-selfsteal.sh && chmod +x install-selfsteal.sh && sudo ./install-selfsteal.sh
+sudo bash <(curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/selfsteal/main/install-selfsteal.sh)
+```
+
+Или через пайп `curl | sudo bash`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/selfsteal/main/install-selfsteal.sh | sudo bash
 ```
 
 ---

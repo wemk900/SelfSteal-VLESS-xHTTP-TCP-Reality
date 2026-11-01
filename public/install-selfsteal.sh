@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # SelfSteal Installer for VLESS XHTTP / TCP Reality (Caddy / Nginx)
+# Запуск одной командой из GitHub (без скачивания):
+#   sudo bash <(curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/selfsteal/main/install-selfsteal.sh)
+#   или:
+#   curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/selfsteal/main/install-selfsteal.sh | sudo bash
 # Поддержка: Ubuntu 20.04/22.04/24.04, Debian 11/12
 # Автообновление Let's Encrypt (acme.sh / certbot) + Логирование запросов
 # Автоматическая проверка DNS через 1.1.1.1, 8.8.8.8, 9.9.9.9
@@ -18,7 +22,8 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 if [[ "${EUID}" -ne 0 ]]; then
-  echo -e "${RED}[ОШИБКА] Запустите скрипт с правами root (sudo bash install-selfsteal.sh)${NC}"
+  echo -e "${RED}[ОШИБКА] Запустите скрипт с правами root:${NC}"
+  echo -e "${CYAN}sudo bash <(curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/selfsteal/main/install-selfsteal.sh)${NC}"
   exit 1
 fi
 
@@ -34,7 +39,7 @@ echo ""
 echo -e "${BOLD}1) Выберите веб-сервер для SelfSteal:${NC}"
 echo -e "   [1] Caddy  (директория: /opt/ss-caddy)"
 echo -e "   [2] Nginx  (директория: /opt/nginx)"
-read -r -p "Ваш выбор [1/2, по умолчанию 1 (Caddy)]: " SERVER_CHOICE
+read -r -p "Ваш выбор [1/2, по умолчанию 1 (Caddy)]: " SERVER_CHOICE < /dev/tty
 SERVER_CHOICE="${SERVER_CHOICE:-1}"
 
 if [[ "${SERVER_CHOICE}" == "2" ]] || [[ "${SERVER_CHOICE,,}" == "nginx" ]]; then
@@ -51,7 +56,7 @@ echo ""
 # ШАГ 2: Запрос домена
 # ------------------------------------------------------------------------------
 echo -e "${BOLD}2) Укажите ваш домен для SelfSteal и сертификата Let's Encrypt:${NC}"
-read -r -p "Домен [например, poland.example.xyz]: " RAW_DOMAIN
+read -r -p "Домен [например, poland.example.xyz]: " RAW_DOMAIN < /dev/tty
 RAW_DOMAIN="${RAW_DOMAIN:-poland.example.xyz}"
 
 CLEAN_INPUT="${RAW_DOMAIN#http://}"
@@ -72,7 +77,7 @@ echo ""
 echo -e "${BOLD}3) Выберите тип транспорта для VLESS Reality:${NC}"
 echo -e "   [1] XHTTP (SplitHTTP) — с указанием пути чанков"
 echo -e "   [2] TCP               — классический VLESS TCP Reality (xtls-rprx-vision)"
-read -r -p "Ваш выбор [1/2, по умолчанию 1 (XHTTP)]: " TRANSPORT_CHOICE
+read -r -p "Ваш выбор [1/2, по умолчанию 1 (XHTTP)]: " TRANSPORT_CHOICE < /dev/tty
 TRANSPORT_CHOICE="${TRANSPORT_CHOICE:-1}"
 
 XHTTP_PATH="/media/v3/chunk/"
@@ -87,7 +92,7 @@ else
   echo ""
   echo -e "${BOLD}   Укажите путь (path) для XHTTP SelfSteal:${NC}"
   echo -e "   (Можно ввести как ${DOMAIN}/media/v3/chunk/ так и /media/v3/chunk/)"
-  read -r -p "Путь XHTTP [по умолчанию ${DOMAIN}${DEFAULT_PATH}]: " RAW_XHTTP_PATH
+  read -r -p "Путь XHTTP [по умолчанию ${DOMAIN}${DEFAULT_PATH}]: " RAW_XHTTP_PATH < /dev/tty
   RAW_XHTTP_PATH="${RAW_XHTTP_PATH:-${DEFAULT_PATH}}"
 
   RAW_XHTTP_PATH="${RAW_XHTTP_PATH#http://}"
@@ -108,7 +113,7 @@ echo ""
 # ШАГ 4: Порт и адрес Target (по умолчанию 127.0.0.1:9443)
 # ------------------------------------------------------------------------------
 echo -e "${BOLD}4) На каком адресе:порту будет работать Target (SelfSteal)?${NC}"
-read -r -p "Target [по умолчанию 127.0.0.1:9443]: " RAW_TARGET
+read -r -p "Target [по умолчанию 127.0.0.1:9443]: " RAW_TARGET < /dev/tty
 RAW_TARGET="${RAW_TARGET:-127.0.0.1:9443}"
 
 if [[ "${RAW_TARGET}" =~ ^[0-9]+$ ]]; then
@@ -130,7 +135,7 @@ echo ""
 # ------------------------------------------------------------------------------
 # Дополнительные параметры: Let's Encrypt автообновление и логирование запросов
 # ------------------------------------------------------------------------------
-read -r -p "Email для уведомлений Let's Encrypt [по умолчанию admin@${DOMAIN}]: " ACME_EMAIL
+read -r -p "Email для уведомлений Let's Encrypt [по умолчанию admin@${DOMAIN}]: " ACME_EMAIL < /dev/tty
 ACME_EMAIL="${ACME_EMAIL:-admin@${DOMAIN}}"
 
 mkdir -p "${BASE_DIR}/conf" "${BASE_DIR}/html" "${BASE_DIR}/ssl" "${BASE_DIR}/logs"
@@ -184,7 +189,7 @@ done
 if [[ "${DNS_MISMATCH}" -ne 0 ]]; then
   echo ""
   echo -e "${YELLOW}[ВНИМАНИЕ] IP домена ${DOMAIN} у одного или нескольких DNS (1.1.1.1 / 8.8.8.8 / 9.9.9.9) не совпадает с IP сервера (${SERVER_IPV4}).${NC}"
-  read -r -p "Продолжить установку несмотря на несовпадение DNS? [y/N]: " DNS_CONTINUE_CHOICE
+  read -r -p "Продолжить установку несмотря на несовпадение DNS? [y/N]: " DNS_CONTINUE_CHOICE < /dev/tty
   DNS_CONTINUE_CHOICE="${DNS_CONTINUE_CHOICE:-N}"
   if [[ "${DNS_CONTINUE_CHOICE,,}" != "y" ]]; then
     echo -e "${RED}Установка прервана пользователем.${NC}"
@@ -344,7 +349,7 @@ case "\${1:-start}" in
     echo "========================================================================"
     ;;
   remove)
-    read -r -p "Удалить SelfSteal и директорию \${BASE_DIR}? [y/N]: " CONFIRM
+    read -r -p "Удалить SelfSteal и директорию \${BASE_DIR}? [y/N]: " CONFIRM < /dev/tty
     if [[ "\${CONFIRM,,}" == "y" ]]; then
       systemctl stop "\${WEB_SERVER}" >/dev/null 2>&1 || true
       (crontab -l 2>/dev/null | grep -v "renew-hook.sh" || true) | crontab -

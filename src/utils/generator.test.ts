@@ -120,12 +120,13 @@ test('generateWebServerConfig and getDirectoryStructure include SSL, HTML, logs,
   assert.ok(files.some((f) => f.path === '/opt/ss-caddy/logs/access.log'));
 });
 
-test('generateBashInstallScript includes 4 sequential prompts, DNS 1.1.1.1/8.8.8.8/9.9.9.9 check, and selfssteal CLI', () => {
+test('generateBashInstallScript includes 4 sequential prompts, /dev/tty curl|bash support, DNS 1.1.1.1/8.8.8.8/9.9.9.9 check, and selfssteal CLI', () => {
   const script = generateBashInstallScript(sampleConfig);
   assert.ok(script.includes('1) Выберите веб-сервер для SelfSteal:'));
   assert.ok(script.includes('2) Укажите ваш домен для SelfSteal'));
   assert.ok(script.includes('3) Выберите тип транспорта для VLESS Reality:'));
   assert.ok(script.includes('4) На каком адресе:порту будет работать Target'));
+  assert.ok(script.includes('< /dev/tty'));
   assert.ok(script.includes('for RESOLVER in "1.1.1.1" "8.8.8.8" "9.9.9.9"; do'));
   assert.ok(script.includes('Продолжить установку несмотря на несовпадение DNS? [y/N]:'));
   assert.ok(script.includes('/usr/local/bin/selfssteal'));
@@ -145,9 +146,9 @@ test('generateSelfstealCliScript and generateCliCommandPreview support start, st
   assert.ok(statusPreview.includes('/opt/ss-caddy/html'));
 });
 
-test('generateGithubReadme includes 4 steps, directory tree, DNS check, and selfssteal CLI', () => {
+test('generateGithubReadme includes one-liner bash <(curl ...), 4 steps, directory tree, DNS check, and selfssteal CLI', () => {
   const readme = generateGithubReadme(sampleConfig);
-  assert.ok(readme.includes('install-selfsteal.sh'));
+  assert.ok(readme.includes('bash <(curl -fsSL https://raw.githubusercontent.com/'));
   assert.ok(readme.includes('selfssteal status'));
   assert.ok(readme.includes('1.1.1.1'));
   assert.ok(readme.includes('8.8.8.8'));
