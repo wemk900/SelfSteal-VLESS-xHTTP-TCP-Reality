@@ -1,187 +1,166 @@
-# SelfSteal Bash Architect — VLESS XHTTP / TCP Reality (Caddy & Nginx)
+# 🔗 SelfSteal Management System — VLESS XHTTP Reality (Caddy)
 
-![Platform](https://img.shields.io/badge/OS-Ubuntu%2020.04%2B%20%7C%20Debian%2011%2B-0ea5e9?style=flat-square)
-![Protocols](https://img.shields.io/badge/VLESS-XHTTP%20%7C%20TCP%20Reality-10b981?style=flat-square)
-![WebServer](https://img.shields.io/badge/Server-Caddy%20%7C%20Nginx-38bdf8?style=flat-square)
-![SSL](https://img.shields.io/badge/SSL-Let's%20Encrypt%20EC--256%20Auto--Renew-f59e0b?style=flat-square)
+**Author:** [t.me/wemkz](https://t.me/wemkz)
 
-Автоматизированный Bash-установщик **`install-selfsteal.sh`** и интерактивный веб-конфигуратор для настройки **SelfSteal** (собственного маскировочного узла) под протоколы **VLESS + XHTTP (SplitHTTP) + Reality** и **VLESS + TCP + Reality (`xtls-rprx-vision`)**.
+![OS](https://img.shields.io/badge/OS-Ubuntu%2020.04%2B%20%7C%20Debian%2011%2B-0ea5e9?style=flat-square)
+![Transport](https://img.shields.io/badge/VLESS-XHTTP%20Reality-10b981?style=flat-square)
+![WebServer](https://img.shields.io/badge/Server-Caddy-38bdf8?style=flat-square)
+![Author](https://img.shields.io/badge/Author-t.me%2Fwemkz-8b5cf6?style=flat-square)
 
----
-
-## Содержание
-
-- [Возможности](#возможности)
-- [Управление через команду `selfssteal`](#управление-через-команду-selfssteal)
-- [Автоматическая сверка DNS (`1.1.1.1`, `8.8.8.8`, `9.9.9.9`)](#автоматическая-сверка-dns-1111-8888-9999)
-- [Архитектура работы SelfSteal](#архитектура-работы-selfsteal)
-- [Быстрый старт (Установка на VPS)](#быстрый-старт-установка-на-vps)
-- [Пошаговый диалог скрипта (4 шага)](#пошаговый-диалог-скрипта-4-шага)
-- [Структура директорий `/opt/ss-caddy` и `/opt/nginx`](#структура-директорий-optss-caddy-и-optnginx)
-- [Настройка доменных записей (DNS)](#настройка-доменных-записей-dns)
-- [Конфигурация Xray / 3X-UI / Marzban](#конфигурация-xray--3x-ui--marzban)
+Красивый цветной Bash-установщик **`install-selfsteal.sh`** с эмодзи-интерфейсом для развертывания маскировочного узла **SelfSteal** под **VLESS + XHTTP / TCP + Reality** с поддержкой **Caddy** (`/opt/ss-caddy`) и **Nginx** (`/opt/nginx`), **6 встроенными HTML-заглушками (с автоматическим случайным выбором)**, глобальной CLI-командой **`selfssteal`**, проверкой DNS через **`1.1.1.1` / `8.8.8.8` / `9.9.9.9`**, автообновлением сертификатов **Let's Encrypt** и ротацией логов.
 
 ---
 
-## Возможности
+## 🚀 Быстрая установка на VPS (одной командой из GitHub без скачивания)
 
-- **Два веб-сервера на выбор**:
-  - **Caddy** — изолированная конфигурация в `/opt/ss-caddy` с поддержкой HTTP/2, H2C и TLS 1.3.
-  - **Nginx** — высокопроизводительная конфигурация в `/opt/nginx` с поддержкой `ssl http2`, gRPC/XHTTP проксирования и кастомных форматов логов.
-- **Поддержка VLESS XHTTP и VLESS TCP Reality**:
-  - Для **XHTTP (SplitHTTP)** скрипт запрашивает кастомный путь чанков (например, `poland.example.xyz/media/v3/chunk/` или `/media/v3/chunk/`) и настраивает маршрутизацию.
-  - Для **TCP Reality** настраивается классический локальный сокет под `xtls-rprx-vision`.
-- **Гибкий Target (Dest)**: по умолчанию локальный сокет **`127.0.0.1:9443`** с возможностью указать любой порт при установке.
-- **Автоматическая проверка DNS при установке**: сверяет `A`-запись вашего домена через **`1.1.1.1`**, **`8.8.8.8`** и **`9.9.9.9`** с внешним IPv4 сервера и предупреждает при расхождении.
-- **Глобальная CLI-команда `selfssteal`**: управление запуском (`selfssteal`), просмотром статуса, аптайма и путей к SSL/HTML (`selfssteal status`) и полным удалением (`selfssteal remove`).
-- **Автоматический SSL Let's Encrypt (ECC EC-256)** и **ротация логов (`logrotate`)**.
+Запустите установщик напрямую через `bash <(curl ...)` (интерактивный ввод работает через `/dev/tty`):
+
+```bash
+bash <(curl -fsSL "https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh")
+```
+
+Или через пайп `curl | bash`:
+
+```bash
+curl -fsSL "https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh" | bash
+```
 
 ---
 
-## Управление через команду `selfssteal`
+## 🎨 6 встроенных HTML-заглушек (Рандомный выбор при установке)
 
-После завершения установки в систему добавляется глобальная команда `/usr/local/bin/selfssteal` (а также симлинк `selfsteal`):
+Во время установки скрипт сохраняет все 6 реалистичных HTML-шаблонов в `/opt/ss-caddy/html/templates/` и **автоматически выбирает случайный шаблон (`RANDOM % 6`)** в `/opt/ss-caddy/html/index.html`. Вы также можете переключить шаблон в любой момент командой `selfssteal template`:
 
-| Команда | Действие |
+| № | Файл шаблона | Описание маскировочной страницы |
+| :--- | :--- | :--- |
+| **1** | 🚀 `1-speedtest.html` | Спидтест с анимированным SVG-гейджем, пингом и цифрами скорости |
+| **2** | ☁️ `2-cloud.html` | Облачное хранилище файлов с сайдбаром, квотой диска и сеткой документов |
+| **3** | 😂 `3-memes.html` | Лента с мемами (**MemeDump**) в тёмной теме с карточками и лайками |
+| **4** | ⚠️ `4-overloaded.html` | Страница «Сервис временно перегружен» (`HTTP 503`) с живым прогресс-баром |
+| **5** | 💻 `5-tech.html` | Технический лендинг инфраструктурной компании (**Nexora Systems**) |
+| **6** | 🐙 `6-gitpage.html` | Страница репозитория в стиле GitHub (**GitPage** — `wemk / core-infra`) |
+
+---
+
+## 🛠️ Управление через CLI команду `selfssteal`
+
+При установке автоматически создается глобальный symlink **`/usr/local/bin/selfssteal -> /opt/ss-caddy/selfssteal.sh`**:
+
+| Команда | Описание |
 | :--- | :--- |
-| **`selfssteal`** | Запускает сервис SelfSteal (Caddy / Nginx) и выводит краткую сводку |
-| **`selfssteal status`** | Показывает статус сервиса (`ACTIVE`), **точный Uptime**, срок действия SSL и пути к директориям **SSL** и **HTML** |
-| **`selfssteal remove`** | Останавливает сервис, удаляет задачу Cron автообновления SSL, очищает `/opt/ss-caddy` или `/opt/nginx` и удаляет CLI |
-| **`selfssteal restart`** | Перезапускает веб-сервер и выводит обновленный статус |
-| **`selfssteal logs`** | Открывает лог запросов `logs/access.log` в реальном времени |
+| `selfssteal start` | ▶️ Запустить сервис SelfSteal (caddy) и показать статус |
+| `selfssteal status` | 📊 Показать статус процесса, **Uptime сервера и процесса**, срок SSL, активный HTML-шаблон и пути к **SSL / HTML** |
+| `selfssteal template` | 🎨 Выбрать один из 6 шаблонов заглушки (`1-speedtest.html` .. `6-gitpage.html`) или случайный |
+| `selfssteal menu` | 📋 Открыть интерактивное меню управления (опции 1–14) |
+| `selfssteal remove` | 🗑️ Полностью остановить и удалить SelfSteal, очистить Cron, директорию `/opt/ss-caddy` и symlink |
+| `selfssteal restart` | 🔄 Перезапустить веб-сервер без обрыва соединений |
+| `selfssteal logs` | 📝 Открыть поток логов запросов (`/opt/ss-caddy/logs/access.log`) в реальном времени |
 
 ### Пример вывода `selfssteal status`:
 
 ```text
 root@vps:~# selfssteal status
-========================================================================
-   СТАТУС SELFSTEAL (VLESS XHTTP REALITY)
-========================================================================
-   • Статус сервиса:        ● ACTIVE (running) — CADDY
-   • Время работы (Uptime): 14d 06:42:19 (с момента запуска: Sun 2026-10-18 05:12:00 UTC)
-   • Домен (SNI):           poland.example.xyz
-   • Протокол / Путь:       XHTTP (poland.example.xyz/media/v3/chunk/)
-   • Target (Dest):         127.0.0.1:9443
-   • Срок действия SSL:     Jan 30 11:54:00 2027 GMT (Let's Encrypt EC-256)
+🔗 Caddy for Reality SelfSteal
+Management System v2.5.0
+Project: VLESS XHTTP Reality | Author: t.me/wemkz
+──────────────────────────────────────────
 
-   ДИРЕКТОРИИ И ФАЙЛЫ (/opt/ss-caddy):
-   • Директория SSL:        /opt/ss-caddy/ssl
-     ├─ Сертификат:         /opt/ss-caddy/ssl/fullchain.pem
-     ├─ Приватный ключ:     /opt/ss-caddy/ssl/privkey.pem
-     └─ Автообновление:     /opt/ss-caddy/ssl/renew-hook.sh
-   • Директория HTML:       /opt/ss-caddy/html
-     └─ Главная стр.:       /opt/ss-caddy/html/index.html
-   • Конфиг сервера:        /opt/ss-caddy/conf/Caddyfile
-   • Директория логов:      /opt/ss-caddy/logs (access.log, error.log)
-========================================================================
+✅ Status: Running (PID: 1842)
+   Server:          Caddy
+   Domain:          poland.example.xyz
+   Transport:       VLESS XHTTP Reality (poland.example.xyz/media/v3/chunk/)
+   Port:            9443 (Target: 127.0.0.1:9443)
+   Uptime сервера:  ⏱️  42 days, 11 hours, 28 minutes
+   Uptime процесса: ⚡ 14d 06:42:19 (с момента запуска: Sun 2026-10-18 05:12:00 UTC)
+   SSL:             ✅ Valid, 73 days left (Let's Encrypt)
+   Template:        🎨 🚀 1-speedtest.html (Спидтест с анимированным гейджем и цифрами)
+
+📂 Директории и пути (/opt/ss-caddy):
+   ├─ 🔒 Путь к SSL:      /opt/ss-caddy/ssl (fullchain.pem, privkey.pem, renew-hook.sh)
+   ├─ 🎨 Путь к HTML:     /opt/ss-caddy/html (index.html + 6 шаблонов в /templates)
+   ├─ ⚙️  Конфигурация:    /opt/ss-caddy/conf/Caddyfile
+   ├─ 📝 Логи запросов:   /opt/ss-caddy/logs (access.log, error.log)
+   └─ 🔗 Глобальный CLI:  /usr/local/bin/selfssteal -> /opt/ss-caddy/selfssteal.sh
+
+📋 Available Operations:
+
+🔧 Service Management:
+   1) 🚀 Reconfigure Caddy
+   2) ▶️  Start services          (selfssteal start)
+   3) ⏹️  Stop services
+   4) 🔄 Restart services        (selfssteal restart)
+   5) 📊 Service status & Uptime (selfssteal status)
+
+🎨 Website Management:
+   6) 🎨 Website templates       (selfssteal template — Random 1-6)
+   7) 📖 Setup guide & streamSettings
+
+📝 Logs & Monitoring:
+   8) 📝 View logs               (selfssteal logs)
+   9) 📊 Log sizes
+   10) 🧹 Clean logs
+   11) ✏️  Edit configuration
+   12) 🔒 Renew SSL certificate
+
+🗑️  Maintenance:
+   13) 🗑️  Uninstall Caddy      (selfssteal remove)
+   14) 🌐 Check DNS (1.1.1.1 / 8.8.8.8 / 9.9.9.9)
+
+   0) ⬅️  Exit
+
+💡 Tip: Use 'selfssteal template' or option 6 to customize website templates
 ```
 
 ---
 
-## Автоматическая сверка DNS (`1.1.1.1`, `8.8.8.8`, `9.9.9.9`)
-
-Один раз во время выполнения `install-selfsteal.sh` (перед выпуском сертификата Let's Encrypt) скрипт определяет внешний IPv4 вашего сервера и проверяет `A`-запись домена через три публичных резолвера:
-
-1. **Cloudflare DNS (`1.1.1.1`)**
-2. **Google Public DNS (`8.8.8.8`)**
-3. **Quad9 DNS (`9.9.9.9`)**
-
-Если IP-адрес домена хотя бы на одном из резолверов не совпадает с внешним IP сервера (например, запись еще не обновилась или включено оранжевое облако Cloudflare Proxy), скрипт выводит предупреждение и спрашивает:
-`Продолжить установку несмотря на несовпадение DNS? [y/N]:`
-
----
-
-## Архитектура работы SelfSteal
+## 📂 Структура директории `/opt/ss-caddy`
 
 ```text
-                       Входящее соединение (Порт 443)
-                                     │
-                                     ▼
-                    ┌─────────────────────────────────┐
-                    │       Xray Core (VLESS)         │
-                    │    Reality TLS Handshake        │
-                    └────────────────┬────────────────┘
-                                     │
-              ┌──────────────────────┴──────────────────────┐
-              │ Авторизованный клиент                       │ Неизвестный клиент / Active Probing (DPI)
-              │ (Валидный ShortId + X25519)                 │ (Запрос сертификата и статики)
-              ▼                                             ▼
-  ┌───────────────────────────┐               ┌───────────────────────────────────┐
-  │ Прямой туннель VLESS      │               │ Target (Dest): 127.0.0.1:9443     │
-  │ • TCP (xtls-rprx-vision)  │               │ Caddy (/opt/ss-caddy) или         │
-  │ • XHTTP (/media/v3/chunk/)│               │ Nginx (/opt/nginx)                │
-  └───────────────────────────┘               │                                   │
-                                              │ • Реальный сертификат Let's Encrypt│
-                                              │ • Отдача статики html/index.html  │
-                                              │ • Запись в logs/access.log        │
-                                              └───────────────────────────────────┘
-```
-
----
-
-## Быстрый старт (Установка одной командой без скачивания)
-
-Скрипт поддерживает интерактивный опрос через `/dev/tty`, поэтому его можно запускать **напрямую из GitHub одной строкой** без предварительного скачивания файла:
-
-```bash
-sudo bash <(curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/selfsteal/main/install-selfsteal.sh)
-```
-
-Или через пайп `curl | sudo bash`:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/selfsteal/main/install-selfsteal.sh | sudo bash
-```
-
----
-
-## Пошаговый диалог скрипта (4 шага)
-
-| Шаг | Вопрос скрипта | Пример ввода | Значение по умолчанию |
-| :-- | :--- | :--- | :--- |
-| **1** | **Веб-сервер**: `Caddy` или `Nginx` | `1` (Caddy) или `2` (Nginx) | `1` (`/opt/ss-caddy`) |
-| **2** | **Домен** для SelfSteal и сертификата Let's Encrypt | `poland.example.xyz` | `poland.example.xyz` |
-| **3** | **Протокол**: `XHTTP` или `TCP` *(если выбран XHTTP — запрашивает путь чанков)* | `1` -> `poland.example.xyz/media/v3/chunk/` | `XHTTP` (`/media/v3/chunk/`) |
-| **4** | **Порт и адрес Target (Dest)** для Xray Reality | `127.0.0.1:9443` (или просто `9443`) | `127.0.0.1:9443` |
-
----
-
-## Структура директорий `/opt/ss-caddy` и `/opt/nginx`
-
-```text
-/opt/ss-caddy/ (или /opt/nginx/)
+/usr/local/bin/selfssteal ─────────► symlink на /opt/ss-caddy/selfssteal.sh
+/opt/ss-caddy/
+├── selfssteal.sh                   # Цветная CLI утилита управления (Author: t.me/wemkz)
 ├── conf/
-│   └── Caddyfile (или nginx.conf)      # Основной конфиг сервера на 127.0.0.1:9443
+│   └── Caddyfile                  # Конфигурация Caddy (слушает 127.0.0.1:9443)
 ├── html/
-│   └── index.html                      # Маскировочный сайт (SelfSteal статика)
+│   ├── index.html                  # Активная HTML-заглушка (выбранная случайно из 6)
+│   └── templates/
+│       ├── 1-speedtest.html        # 🚀 Спидтест с анимированным гейджем
+│       ├── 2-cloud.html            # ☁️ Облачное хранилище
+│       ├── 3-memes.html            # 😂 Лента с мемами
+│       ├── 4-overloaded.html       # ⚠️ Сервис перегружен (503)
+│       ├── 5-tech.html             # 💻 Технический лендинг (Nexora Systems)
+│       └── 6-gitpage.html          # 🐙 Репозиторий GitPage (wemk / core-infra)
 ├── ssl/
-│   ├── fullchain.pem                   # Публичная цепочка сертификатов Let's Encrypt (chmod 644)
-│   ├── privkey.pem                     # Приватный ключ ECDSA P-256 (chmod 600)
-│   └── renew-hook.sh                   # Скрипт автоматического обновления SSL и перезагрузки
-├── logs/
-│   ├── access.log                      # Журнал входящих HTTP/HTTPS запросов (JSON / Combined)
-│   ├── error.log                       # Журнал ошибок веб-сервера
-│   └── ssl-renew.log                   # Журнал фонового обновления сертификатов Cron
-└── xray-reality-reference.json         # Готовый эталонный конфиг для вставки в Xray
+│   ├── fullchain.pem               # Сертификат Let's Encrypt (ECC P-256)
+│   ├── privkey.pem                 # Приватный ключ TLS (chmod 600)
+│   └── renew-hook.sh               # Скрипт автообновления по Cron (ежедневно в 03:15)
+└── logs/
+    ├── access.log                  # Логи входящих запросов (JSON, ротация 14 дн.)
+    └── error.log                   # Логи ошибок и предупреждений TLS
 ```
 
 ---
 
-## Настройка доменных записей (DNS)
+## 🌐 Доменные записи (DNS) для `poland.example.xyz`
 
-| Тип | Имя (Host) | Значение (Value) | TTL | Проксирование (Cloudflare) | Назначение |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **A** | `poland` *(или `@`)* | `IPv4 вашего VPS` | `Auto / 300` | **DNS Only (Серое облако)** | Прямое подключение к VPS для Reality и валидации Let's Encrypt |
-| **AAAA** | `poland` *(опц.)* | `IPv6 вашего VPS` | `Auto / 300` | **DNS Only (Серое облако)** | Поддержка IPv6 маршрутизации |
-| **CAA** | `@` | `0 issue "letsencrypt.org"` | `3600` | **DNS Only** | Разрешает выпуск сертификатов Let's Encrypt |
+| Тип | Имя | Значение | TTL | Режим проксирования |
+| :--- | :--- | :--- | :--- | :--- |
+| **A** | `poland.example.xyz` | `185.212.140.42` | `300 (Auto)` | **DNS Only (Без облачка Cloudflare)** |
+| **CAA** | `@` | `0 issue "letsencrypt.org"` | `3600` | **DNS Only** |
 
 ---
 
-## Конфигурация Xray (`streamSettings`)
+## 📖 Что прописать в конфиг Xray (`streamSettings`)
 
-Что нужно прописать в блок `streamSettings` конфигурации Xray / Remnawave / Marzban / 3X-UI:
+- **Target (Dest)**: `127.0.0.1:9443`
+- **ServerNames (SNI)**: `poland.example.xyz`
+- **XHTTP Path**: `/media/v3/chunk/` (`poland.example.xyz/media/v3/chunk/`)
+- **Private Key**: `YOUR_X25519_PRIVATE_KEY`
+- **Public Key**: `YOUR_X25519_PUBLIC_KEY`
+- **ShortId**: `a1b2c3d4e5f60718`
 
 ```json
+{
   "streamSettings": {
     "network": "xhttp",
     "security": "reality",
@@ -205,5 +184,5 @@ curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/selfsteal/main/instal
       "mode": "auto"
     }
   }
+}
 ```
-

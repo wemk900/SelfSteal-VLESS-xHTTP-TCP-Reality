@@ -1,7 +1,15 @@
+import {
+  STUB_TEMPLATES,
+  getStubTemplateById,
+  generateBashTemplatesInstaller,
+  type StubTemplateId,
+} from './htmlTemplates';
+
+export { STUB_TEMPLATES, getStubTemplateById, type StubTemplateId };
 export type WebServerType = 'caddy' | 'nginx';
 export type TransportType = 'xhttp' | 'tcp';
 export type LogFormatType = 'json' | 'combined';
-export type CamouflageTheme = 'cdn-edge' | 'cloud-storage' | 'corporate-node';
+export type CamouflageTheme = StubTemplateId | 'cdn-edge' | 'cloud-storage' | 'corporate-node';
 
 export interface SelfStealConfig {
   webServer: WebServerType;
@@ -535,74 +543,15 @@ export function getDnsRecords(config: SelfStealConfig): DnsRecordItem[] {
 
 /**
  * Generates camouflage HTML file stored in /opt/ss-caddy/html/index.html or /opt/nginx/html/index.html
+ * Uses one of the 6 templates from stubs.zip (1-speedtest.html .. 6-gitpage.html)
  */
 export function generateCamouflageHtml(config: SelfStealConfig): string {
-  const normPath = normalizeXhttpPath(config.xhttpPath, config.domain);
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${config.domain} — Edge Content Delivery Node</title>
-  <style>
-    :root { color-scheme: dark; }
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #0b0f17;
-      color: #e2e8f0;
-      display: flex;
-      min-height: 100vh;
-      align-items: center;
-      justify-content: center;
-    }
-    .card {
-      max-width: 540px;
-      width: 90%;
-      background: #111827;
-      border: 1px solid #1f2937;
-      border-radius: 10px;
-      padding: 32px;
-    }
-    .meta {
-      font-family: monospace;
-      font-size: 12px;
-      color: #94a3b8;
-      margin-bottom: 12px;
-    }
-    h1 { font-size: 20px; margin: 0 0 12px; color: #f8fafc; }
-    p { font-size: 14px; line-height: 1.6; color: #94a3b8; margin: 0 0 20px; }
-    .grid {
-      border-top: 1px solid #1f2937;
-      padding-top: 16px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      font-family: monospace;
-      font-size: 12px;
-    }
-    .label { color: #64748b; }
-    .val { color: #cbd5e1; margin-top: 4px; }
-  </style>
-</head>
-<body>
-  <main class="card">
-    <div class="meta">EDGE NODE · ${config.domain.toUpperCase()}</div>
-    <h1>Static Media &amp; Object Storage Gateway</h1>
-    <p>This edge gateway serves static media segments and encrypted transport streams for authorized origin endpoints.</p>
-    <div class="grid">
-      <div>
-        <div class="label">TLS Profile</div>
-        <div class="val">TLS 1.3 / ALPN h2</div>
-      </div>
-      <div>
-        <div class="label">Endpoint Path</div>
-        <div class="val">${config.transport === 'xhttp' ? normPath : '/static/v1/'}</div>
-      </div>
-    </div>
-  </main>
-</body>
-</html>`;
+  const themeId = (
+    STUB_TEMPLATES.some((t) => t.id === config.camouflageTheme)
+      ? config.camouflageTheme
+      : '1-speedtest.html'
+  ) as StubTemplateId;
+  return getStubTemplateById(themeId).html;
 }
 
 /**
@@ -679,32 +628,40 @@ ${baseDir}/logs/*.log {
 }
 
 /**
- * Generates the /usr/local/bin/selfssteal (and symlink /usr/local/bin/selfsteal) CLI management script
+ * Generates the \${BASE_DIR}/selfssteal.sh CLI management script linked via global symlink /usr/local/bin/selfssteal
  */
 export function generateSelfstealCliScript(config: SelfStealConfig): string {
   const baseDir = getBaseDirectory(config.webServer);
-  const { fullTarget } = normalizeTargetAddress(config.target);
+  const { fullTarget, port } = normalizeTargetAddress(config.target);
   const normPath = normalizeXhttpPath(config.xhttpPath, config.domain);
   const confFile = config.webServer === 'caddy' ? 'Caddyfile' : 'nginx.conf';
+  const serverDisplayName = config.webServer === 'caddy' ? 'Caddy' : 'Nginx';
 
   return `#!/usr/bin/env bash
 # ==============================================================================
-# CLI утилита управления SelfSteal: /usr/local/bin/selfssteal (алиас: selfsteal)
-# Команды:
-#   selfssteal          — запустить сервис SelfSteal и показать краткую сводку
-#   selfssteal status   — статус сервиса, точный Uptime и директории SSL / HTML / Конфигов
-#   selfssteal remove   — полное удаление SelfSteal, очистка Cron и директорий
-#   selfssteal restart  — перезапуск сервиса (${config.webServer})
-#   selfssteal logs     — просмотр логов запросов в реальном времени
+# 🔗 ${serverDisplayName} for Reality SelfSteal — Management System v2.5.0
+# Author: t.me/wemkz
+# Путь скрипта: ${baseDir}/selfssteal.sh
+# Глобальный symlink: /usr/local/bin/selfssteal -> ${baseDir}/selfssteal.sh
+# Поддерживаемые команды:
+#   selfssteal start     — ▶️ запустить сервис SelfSteal
+#   selfssteal status    — 📊 статус процесса, Uptime сервера/процесса, пути к SSL и HTML
+#   selfssteal remove    — 🗑️ полное удаление SelfSteal, очистка Cron, директорий и symlink
+#   selfssteal template  — 🎨 выбор или рандомная смена HTML-заглушки (1-6)
+#   selfssteal menu      — 📋 открыть интерактивное меню управления (1-14)
+#   selfssteal restart   — 🔄 перезапуск сервиса (${config.webServer})
+#   selfssteal logs      — 📝 просмотр логов запросов в реальном времени
 # ==============================================================================
 set -euo pipefail
 
 WEB_SERVER="${config.webServer}"
+SERVER_TITLE="${serverDisplayName}"
 BASE_DIR="${baseDir}"
 DOMAIN="${config.domain}"
 TRANSPORT="${config.transport}"
 XHTTP_PATH="${normPath}"
 TARGET="${fullTarget}"
+TARGET_PORT="${port}"
 CONF_FILE="\${BASE_DIR}/conf/${confFile}"
 SSL_DIR="\${BASE_DIR}/ssl"
 HTML_DIR="\${BASE_DIR}/html"
@@ -713,13 +670,24 @@ LOGS_DIR="\${BASE_DIR}/logs"
 RED='\\033[0;31m'
 GREEN='\\033[0;32m'
 YELLOW='\\033[1;33m'
+BLUE='\\033[0;34m'
+MAGENTA='\\033[0;35m'
 CYAN='\\033[0;36m'
+WHITE='\\033[1;37m'
 BOLD='\\033[1m'
 NC='\\033[0m'
 
+get_server_uptime() {
+  uptime -p 2>/dev/null | sed 's/^up //' || uptime | awk -F'( |,|:)+' '{print \$6" "\$7", "\$8" hours"}' 2>/dev/null || echo "N/A"
+}
+
+get_process_pid() {
+  systemctl show -p MainPID --value "\${WEB_SERVER}" 2>/dev/null || echo "0"
+}
+
 get_service_uptime() {
   local pid
-  pid=\$(systemctl show -p MainPID --value "\${WEB_SERVER}" 2>/dev/null || echo "0")
+  pid=\$(get_process_pid)
   if [[ -n "\${pid}" && "\${pid}" != "0" ]] && ps -p "\${pid}" >/dev/null 2>&1; then
     local etime
     etime=\$(ps -o etime= -p "\${pid}" 2>/dev/null | xargs || echo "N/A")
@@ -733,89 +701,184 @@ get_service_uptime() {
 
 get_ssl_expiry() {
   if [[ -f "\${SSL_DIR}/fullchain.pem" ]]; then
-    openssl x509 -enddate -noout -in "\${SSL_DIR}/fullchain.pem" 2>/dev/null | cut -d= -f2 || echo "Сертификат присутствует"
+    local end_date
+    end_date=\$(openssl x509 -enddate -noout -in "\${SSL_DIR}/fullchain.pem" 2>/dev/null | cut -d= -f2 || echo "")
+    if [[ -n "\${end_date}" ]]; then
+      local end_epoch now_epoch days_left
+      end_epoch=\$(date -d "\${end_date}" +%s 2>/dev/null || echo "0")
+      now_epoch=\$(date +%s)
+      if [[ "\${end_epoch}" -gt "\${now_epoch}" ]]; then
+        days_left=\$(( (end_epoch - now_epoch) / 86400 ))
+        echo "✅ Valid, \${days_left} days left (Let's Encrypt)"
+        return
+      fi
+    fi
+    echo "✅ Valid (Let's Encrypt)"
   else
-    echo "Файл сертификата не найден"
+    echo "❌ Certificate not found"
   fi
+}
+
+get_current_template() {
+  if [[ -f "\${HTML_DIR}/.current_template" ]]; then
+    cat "\${HTML_DIR}/.current_template"
+  else
+    echo "1-speedtest.html"
+  fi
+}
+
+print_header() {
+  echo -e "\${WHITE}🔗 \${SERVER_TITLE} for Reality SelfSteal\${NC}"
+  echo -e "\${CYAN}Management System v2.5.0\${NC}"
+  echo -e "\${BLUE}Project: VLESS \${TRANSPORT^^} Reality | Author: t.me/wemkz\${NC}"
+  echo -e "\${BLUE}──────────────────────────────────────────\${NC}"
+  echo ""
 }
 
 cmd_start() {
-  echo -e "\${CYAN}========================================================================\${NC}"
-  echo -e "\${BOLD}   ЗАПУСК SELFSTEAL (\${WEB_SERVER^^} · \${DOMAIN} · \${TARGET})\${NC}"
-  echo -e "\${CYAN}========================================================================\${NC}"
+  print_header
+  echo -e "\${CYAN}🚀 Запуск сервиса SelfSteal (\${SERVER_TITLE} · \${DOMAIN} · \${TARGET})...\${NC}"
   systemctl enable "\${WEB_SERVER}" >/dev/null 2>&1 || true
   systemctl start "\${WEB_SERVER}"
-  sleep 0.5
+  sleep 0.4
+  local pid
+  pid=\$(get_process_pid)
   if systemctl is-active --quiet "\${WEB_SERVER}"; then
-    echo -e "   • Состояние:      \${GREEN}ACTIVE (Запущен)\${NC}"
-    echo -e "   • Uptime:         \${GREEN}\$(get_service_uptime)\${NC}"
-    echo -e "   • Target сокет:   \${CYAN}\${TARGET}\${NC}"
-    echo -e "   • Директория SSL: \${CYAN}\${SSL_DIR}\${NC}"
-    echo -e "   • Директория HTML:\${CYAN}\${HTML_DIR}\${NC}"
-    echo -e "   • Конфигурация:   \${CYAN}\${CONF_FILE}\${NC}"
+    echo -e "✅ \${GREEN}Status: Running (PID: \${pid})\${NC}"
+    echo -e "   \${WHITE}Server:\${NC}          \${SERVER_TITLE}"
+    echo -e "   \${WHITE}Domain:\${NC}          \${DOMAIN}"
+    echo -e "   \${WHITE}Port (Target):\${NC}   \${TARGET}"
+    echo -e "   \${WHITE}Uptime сервера:\${NC}  \${GREEN}⏱️  \$(get_server_uptime)\${NC}"
+    echo -e "   \${WHITE}Uptime процесса:\${NC} \${GREEN}⚡ \$(get_service_uptime)\${NC}"
+    echo -e "   \${WHITE}SSL Directory:\${NC}   \${CYAN}🔒 \${SSL_DIR}\${NC}"
+    echo -e "   \${WHITE}HTML Directory:\${NC}  \${CYAN}🎨 \${HTML_DIR} (\$(get_current_template))\${NC}"
+    echo -e "   \${WHITE}Config File:\${NC}     \${CYAN}⚙️  \${CONF_FILE}\${NC}"
   else
-    echo -e "   • Состояние:      \${RED}ОШИБКА ЗАПУСКА (проверьте journalctl -u \${WEB_SERVER})\${NC}"
+    echo -e "❌ \${RED}Status: Failed to start (проверьте journalctl -u \${WEB_SERVER})\${NC}"
     exit 1
   fi
-  echo -e "\${CYAN}========================================================================\${NC}"
 }
 
 cmd_status() {
-  local is_running="false"
+  print_header
+  local pid
+  pid=\$(get_process_pid)
   if systemctl is-active --quiet "\${WEB_SERVER}"; then
-    is_running="true"
-  fi
-
-  echo -e "\${CYAN}========================================================================\${NC}"
-  echo -e "\${BOLD}   СТАТУС SELFSTEAL (VLESS \${TRANSPORT^^} REALITY)\${NC}"
-  echo -e "\${CYAN}========================================================================\${NC}"
-  if [[ "\${is_running}" == "true" ]]; then
-    echo -e "   • Статус сервиса:    \${GREEN}● ACTIVE (running) — \${WEB_SERVER^^}\${NC}"
+    echo -e "✅ \${GREEN}Status: Running (PID: \${pid})\${NC}"
   else
-    echo -e "   • Статус сервиса:    \${RED}○ INACTIVE (stopped) — \${WEB_SERVER^^}\${NC}"
+    echo -e "❌ \${RED}Status: Stopped\${NC}"
   fi
-  echo -e "   • Время работы (Uptime): \${GREEN}\$(get_service_uptime)\${NC}"
-  echo -e "   • Домен (SNI):       \${CYAN}\${DOMAIN}\${NC}"
-  echo -e "   • Протокол / Путь:   \${CYAN}\${TRANSPORT^^}\$( [[ "\${TRANSPORT}" == "xhttp" ]] && echo " (\${DOMAIN}\${XHTTP_PATH})" || echo " (xtls-rprx-vision)" )\${NC}"
-  echo -e "   • Target (Dest):     \${GREEN}\${TARGET}\${NC}"
-  echo -e "   • Срок действия SSL: \${YELLOW}\$(get_ssl_expiry)\${NC}"
+  echo -e "   \${WHITE}Server:\${NC}          \${SERVER_TITLE}"
+  echo -e "   \${WHITE}Domain:\${NC}          \${DOMAIN}"
+  echo -e "   \${WHITE}Transport:\${NC}       VLESS \${TRANSPORT^^} Reality \$( [[ "\${TRANSPORT}" == "xhttp" ]] && echo "(\${DOMAIN}\${XHTTP_PATH})" || echo "(xtls-rprx-vision)" )"
+  echo -e "   \${WHITE}Port (Target):\${NC}   \${TARGET}"
+  echo -e "   \${WHITE}Uptime сервера:\${NC}  \${GREEN}⏱️  \$(get_server_uptime)\${NC}"
+  echo -e "   \${WHITE}Uptime процесса:\${NC} \${GREEN}⚡ \$(get_service_uptime)\${NC}"
+  echo -e "   \${WHITE}SSL:\${NC}             \${GREEN}\$(get_ssl_expiry)\${NC}"
+  echo -e "   \${WHITE}Template:\${NC}        \${MAGENTA}🎨 \$(get_current_template)\${NC}"
   echo ""
-  echo -e "\${BOLD}   ДИРЕКТОРИИ И ФАЙЛЫ (\${BASE_DIR}):\${NC}"
-  echo -e "   • Директория SSL:    \${CYAN}\${SSL_DIR}\${NC}"
-  echo -e "     ├─ Сертификат:     \${SSL_DIR}/fullchain.pem"
-  echo -e "     ├─ Приватный ключ: \${SSL_DIR}/privkey.pem"
-  echo -e "     └─ Автообновление: \${SSL_DIR}/renew-hook.sh"
-  echo -e "   • Директория HTML:   \${CYAN}\${HTML_DIR}\${NC}"
-  echo -e "     └─ Главная стр.:   \${HTML_DIR}/index.html"
-  echo -e "   • Конфиг сервера:    \${CYAN}\${CONF_FILE}\${NC}"
-  echo -e "   • Директория логов:  \${CYAN}\${LOGS_DIR}\${NC} (access.log, error.log)"
-  echo -e "\${CYAN}========================================================================\${NC}"
+  echo -e "📂 \${WHITE}Директории и пути (\${BASE_DIR}):\${NC}"
+  echo -e "   ├─ 🔒 \${WHITE}Путь к SSL:\${NC}      \${CYAN}\${SSL_DIR}\${NC} (fullchain.pem, privkey.pem, renew-hook.sh)"
+  echo -e "   ├─ 🎨 \${WHITE}Путь к HTML:\${NC}     \${CYAN}\${HTML_DIR}\${NC} (index.html + 6 шаблонов в /templates)"
+  echo -e "   ├─ ⚙️  \${WHITE}Конфигурация:\${NC}    \${CYAN}\${CONF_FILE}\${NC}"
+  echo -e "   ├─ 📝 \${WHITE}Логи запросов:\${NC}   \${CYAN}\${LOGS_DIR}\${NC} (access.log, error.log)"
+  echo -e "   └─ 🔗 \${WHITE}Глобальный CLI:\${NC}  \${CYAN}/usr/local/bin/selfssteal -> \${BASE_DIR}/selfssteal.sh\${NC}"
+}
+
+cmd_template() {
+  print_header
+  echo -e "🎨 \${WHITE}Выберите HTML-заглушку для маскировки SelfSteal (\${HTML_DIR}/index.html):\${NC}"
+  echo -e "   \${WHITE}1)\${NC} 🚀 \${GREEN}1-speedtest.html\${NC}  — Спидтест с анимированным гейджем и цифрами"
+  echo -e "   \${WHITE}2)\${NC} ☁️  \${GREEN}2-cloud.html\${NC}      — Облачное хранилище, сайдбар + сетка файлов"
+  echo -e "   \${WHITE}3)\${NC} 😂 \${GREEN}3-memes.html\${NC}      — Лента с мемами (MemeDump), тёмная тема"
+  echo -e "   \${WHITE}4)\${NC} ⚠️  \${GREEN}4-overloaded.html\${NC} — Страница «Сервис перегружен» (503) с прогресс-баром"
+  echo -e "   \${WHITE}5)\${NC} 💻 \${GREEN}5-tech.html\${NC}       — Технический лендинг (Nexora Systems)"
+  echo -e "   \${WHITE}6)\${NC} 🐙 \${GREEN}6-gitpage.html\${NC}    — Страница репозитория в стиле GitHub (GitPage)"
+  echo -e "   \${WHITE}7)\${NC} 🎲 \${CYAN}Случайный выбор (Random 1-6)\${NC}"
+  echo ""
+  read -r -p "Select template [1-7, default 7 (Random)]: " TPL_CHOICE < /dev/tty
+  TPL_CHOICE="\${TPL_CHOICE:-7}"
+  local files=("1-speedtest.html" "2-cloud.html" "3-memes.html" "4-overloaded.html" "5-tech.html" "6-gitpage.html")
+  local chosen=""
+  if [[ "\${TPL_CHOICE}" =~ ^[1-6]$ ]]; then
+    chosen="\${files[\$((TPL_CHOICE - 1))]}"
+  else
+    chosen="\${files[\$((RANDOM % 6))]}"
+  fi
+  if [[ -f "\${HTML_DIR}/templates/\${chosen}" ]]; then
+    cp -f "\${HTML_DIR}/templates/\${chosen}" "\${HTML_DIR}/index.html"
+    echo "\${chosen}" > "\${HTML_DIR}/.current_template"
+    echo -e "✅ \${GREEN}Активная HTML-заглушка обновлена на: \${chosen}\${NC}"
+  else
+    echo -e "⚠️  \${YELLOW}Шаблон \${chosen} не найден в \${HTML_DIR}/templates\${NC}"
+  fi
 }
 
 cmd_remove() {
-  echo -e "\${YELLOW}========================================================================\${NC}"
-  echo -e "\${BOLD}   УДАЛЕНИЕ SELFSTEAL (\${BASE_DIR})\${NC}"
-  echo -e "\${YELLOW}========================================================================\${NC}"
+  print_header
+  echo -e "🗑️  \${RED}\${BOLD}УДАЛЕНИЕ SELFSTEAL (\${BASE_DIR})\${NC}"
   read -r -p "Вы уверены, что хотите остановить SelfSteal и удалить \${BASE_DIR}? [y/N]: " CONFIRM < /dev/tty
   if [[ "\${CONFIRM,,}" != "y" ]]; then
-    echo -e "\${CYAN}Отмена удаления.\${NC}"
+    echo -e "ℹ️  \${CYAN}Отмена удаления.\${NC}"
     exit 0
   fi
 
-  echo -e "[1/4] Остановка сервиса \${WEB_SERVER}..."
+  echo -e "⏹️  [1/4] Остановка сервиса \${WEB_SERVER}..."
   systemctl stop "\${WEB_SERVER}" >/dev/null 2>&1 || true
 
-  echo -e "[2/4] Удаление задачи автообновления SSL из Cron и ротации логов..."
+  echo -e "🧹 [2/4] Удаление задачи автообновления SSL из Cron и ротации логов..."
   (crontab -l 2>/dev/null | grep -v "renew-hook.sh" || true) | crontab -
   rm -f "/etc/logrotate.d/selfsteal-\${WEB_SERVER}"
 
-  echo -e "[3/4] Удаление рабочей директории \${BASE_DIR} (conf, ssl, html, logs)..."
+  echo -e "🗑️  [3/4] Удаление рабочей директории \${BASE_DIR} (conf, ssl, html, logs)..."
   rm -rf "\${BASE_DIR}"
 
-  echo -e "[4/4] Удаление CLI команды /usr/local/bin/selfssteal..."
+  echo -e "🔗 [4/4] Удаление глобального symlink /usr/local/bin/selfssteal..."
   rm -f /usr/local/bin/selfssteal /usr/local/bin/selfsteal
 
-  echo -e "\${GREEN}✓ SelfSteal полностью удален с сервера.\${NC}"
+  echo -e "✅ \${GREEN}SelfSteal полностью удален с сервера.\${NC}"
+}
+
+cmd_menu() {
+  cmd_status
+  echo ""
+  echo -e "📋 \${WHITE}Available Operations:\${NC}"
+  echo ""
+  echo -e "🔧 \${WHITE}Service Management:\${NC}"
+  echo -e "   \${WHITE}1)\${NC} ▶️  \${GREEN}Start services\${NC} (selfssteal start)"
+  echo -e "   \${WHITE}2)\${NC} ⏹️  \${GREEN}Stop services\${NC}"
+  echo -e "   \${WHITE}3)\${NC} 🔄 \${GREEN}Restart services\${NC} (selfssteal restart)"
+  echo -e "   \${WHITE}4)\${NC} 📊 \${GREEN}Service status & Uptime\${NC} (selfssteal status)"
+  echo ""
+  echo -e "🎨 \${WHITE}Website Management:\${NC}"
+  echo -e "   \${WHITE}5)\${NC} 🎨 \${GREEN}Website templates (Random / 1-6)\${NC} (selfssteal template)"
+  echo -e "   \${WHITE}6)\${NC} 📖 \${GREEN}Show Xray streamSettings JSON\${NC}"
+  echo ""
+  echo -e "📝 \${WHITE}Logs & SSL Monitoring:\${NC}"
+  echo -e "   \${WHITE}7)\${NC} 📝 \${GREEN}View live access logs\${NC} (selfssteal logs)"
+  echo -e "   \${WHITE}8)\${NC} 🧹 \${GREEN}Clean logs\${NC}"
+  echo -e "   \${WHITE}9)\${NC} 🔒 \${GREEN}Renew SSL certificate\${NC}"
+  echo ""
+  echo -e "🗑️  \${WHITE}Maintenance:\${NC}"
+  echo -e "   \${WHITE}10)\${NC} 🗑️  \${RED}Uninstall SelfSteal\${NC} (selfssteal remove)"
+  echo ""
+  echo -e "   \${WHITE}0)\${NC} ⬅️  \${GREEN}Exit\${NC}"
+  echo ""
+  echo -e "💡 \${BLUE}Tip: Use 'selfssteal template' or option 5 to customize website templates\${NC}"
+  read -r -p "Select option [0-10]: " MENU_OPT < /dev/tty
+  case "\${MENU_OPT}" in
+    1) cmd_start ;;
+    2) systemctl stop "\${WEB_SERVER}" && echo -e "⏹️  \${YELLOW}Service stopped.\${NC}" ;;
+    3) systemctl restart "\${WEB_SERVER}" && echo -e "🔄 \${GREEN}Service restarted.\${NC}" ;;
+    4) cmd_status ;;
+    5) cmd_template ;;
+    6) cat "\${BASE_DIR}/xray-reality-reference.json" 2>/dev/null || true ;;
+    7) tail -n 50 -f "\${LOGS_DIR}/access.log" ;;
+    8) truncate -s 0 "\${LOGS_DIR}/access.log" "\${LOGS_DIR}/error.log" 2>/dev/null && echo -e "🧹 \${GREEN}Логи очищены.\${NC}" ;;
+    9) "\${SSL_DIR}/renew-hook.sh" && echo -e "🔒 \${GREEN}Сертификат обновлен.\${NC}" ;;
+    10) cmd_remove ;;
+    *) exit 0 ;;
+  esac
 }
 
 ACTION="\${1:-start}"
@@ -829,88 +892,140 @@ case "\${ACTION}" in
   remove|uninstall|delete)
     cmd_remove
     ;;
+  template|templates|stub)
+    cmd_template
+    ;;
+  menu)
+    cmd_menu
+    ;;
   restart|reload)
     systemctl restart "\${WEB_SERVER}"
-    echo -e "\${GREEN}✓ Сервис \${WEB_SERVER} перезапущен.\${NC}"
+    echo -e "🔄 \${GREEN}Сервис \${WEB_SERVER} перезапущен.\${NC}"
     cmd_status
     ;;
   logs|log)
     tail -n 50 -f "\${LOGS_DIR}/access.log"
     ;;
   *)
-    echo -e "\${BOLD}Использование команды selfssteal:\${NC}"
-    echo -e "  \${CYAN}selfssteal\${NC}          — запустить SelfSteal"
-    echo -e "  \${CYAN}selfssteal status\${NC}   — показать статус, Uptime и директории SSL / HTML / конфигов"
-    echo -e "  \${CYAN}selfssteal remove\${NC}   — полностью удалить SelfSteal и директории"
-    echo -e "  \${CYAN}selfssteal restart\${NC}  — перезапустить веб-сервер (\${WEB_SERVER})"
-    echo -e "  \${CYAN}selfssteal logs\${NC}     — открыть логи запросов в реальном времени"
+    print_header
+    echo -e "\${BOLD}Использование: selfssteal {start|status|remove|template|menu|restart|logs}\${NC}"
+    echo -e "  ▶️  \${CYAN}selfssteal start\${NC}     — запустить сервис SelfSteal"
+    echo -e "  📊 \${CYAN}selfssteal status\${NC}    — показать Uptime сервера/процесса и пути к SSL / HTML"
+    echo -e "  🗑️  \${CYAN}selfssteal remove\${NC}    — полностью удалить SelfSteal, директории и symlink"
+    echo -e "  🎨 \${CYAN}selfssteal template\${NC}  — сменить HTML-заглушку (1-6 или Random)"
+    echo -e "  📋 \${CYAN}selfssteal menu\${NC}      — интерактивное меню управления"
+    echo -e "  🔄 \${CYAN}selfssteal restart\${NC}   — перезапустить веб-сервер (\${WEB_SERVER})"
+    echo -e "  📝 \${CYAN}selfssteal logs\${NC}      — открыть логи запросов в реальном времени"
     ;;
 esac
 `;
 }
 
 /**
- * Generates realistic terminal output for `selfssteal`, `selfssteal status`, and `selfssteal remove`
+ * Generates realistic terminal output for `selfssteal start`, `selfssteal status`, and `selfssteal remove`
  */
 export function generateCliCommandPreview(
   config: SelfStealConfig,
   command: 'start' | 'status' | 'remove'
 ): string {
   const baseDir = getBaseDirectory(config.webServer);
-  const { fullTarget } = normalizeTargetAddress(config.target);
+  const { fullTarget, port } = normalizeTargetAddress(config.target);
   const normPath = normalizeXhttpPath(config.xhttpPath, config.domain);
   const confFile = config.webServer === 'caddy' ? 'Caddyfile' : 'nginx.conf';
+  const serverDisplayName = config.webServer === 'caddy' ? 'Caddy' : 'Nginx';
+  const tpl = getStubTemplateById(
+    (STUB_TEMPLATES.some((t) => t.id === config.camouflageTheme)
+      ? config.camouflageTheme
+      : 'random') as StubTemplateId
+  );
 
   if (command === 'start') {
-    return `root@vps:~# selfssteal
-========================================================================
-   ЗАПУСК SELFSTEAL (${config.webServer.toUpperCase()} · ${config.domain} · ${fullTarget})
-========================================================================
-   • Состояние:      ACTIVE (Запущен)
-   • Uptime:         14d 06:42:19 (с момента запуска: Sun 2026-10-18 05:12:00 UTC)
-   • Target сокет:   ${fullTarget}
-   • Директория SSL: ${baseDir}/ssl
-   • Директория HTML:${baseDir}/html
-   • Конфигурация:   ${baseDir}/conf/${confFile}
-========================================================================`;
+    return `root@vps:~# selfssteal start
+🔗 ${serverDisplayName} for Reality SelfSteal
+Management System v2.5.0
+Project: VLESS ${config.transport.toUpperCase()} Reality | Author: t.me/wemkz
+──────────────────────────────────────────
+
+🚀 Запуск сервиса SelfSteal (${serverDisplayName} · ${config.domain} · ${fullTarget})...
+✅ Status: Running (PID: 1842)
+   Server:          ${serverDisplayName}
+   Domain:          ${config.domain}
+   Port (Target):   ${fullTarget}
+   Uptime сервера:  ⏱️  42 days, 11 hours, 28 minutes
+   Uptime процесса: ⚡ 14d 06:42:19 (с момента запуска: Sun 2026-10-18 05:12:00 UTC)
+   SSL Directory:   🔒 ${baseDir}/ssl
+   HTML Directory:  🎨 ${baseDir}/html (${tpl.emoji} ${tpl.id})
+   Config File:     ⚙️  ${baseDir}/conf/${confFile}`;
   }
 
   if (command === 'remove') {
     return `root@vps:~# selfssteal remove
-========================================================================
-   УДАЛЕНИЕ SELFSTEAL (${baseDir})
-========================================================================
+🔗 ${serverDisplayName} for Reality SelfSteal
+Management System v2.5.0
+Project: VLESS ${config.transport.toUpperCase()} Reality | Author: t.me/wemkz
+──────────────────────────────────────────
+
+🗑️  УДАЛЕНИЕ SELFSTEAL (${baseDir})
 Вы уверены, что хотите остановить SelfSteal и удалить ${baseDir}? [y/N]: y
-[1/4] Остановка сервиса ${config.webServer}...
-[2/4] Удаление задачи автообновления SSL из Cron и ротации логов...
-[3/4] Удаление рабочей директории ${baseDir} (conf, ssl, html, logs)...
-[4/4] Удаление CLI команды /usr/local/bin/selfssteal...
-✓ SelfSteal полностью удален с сервера.`;
+⏹️  [1/4] Остановка сервиса ${config.webServer}...
+🧹 [2/4] Удаление задачи автообновления SSL из Cron и ротации логов...
+🗑️  [3/4] Удаление рабочей директории ${baseDir} (conf, ssl, html, logs)...
+🔗 [4/4] Удаление глобального symlink /usr/local/bin/selfssteal...
+✅ SelfSteal полностью удален с сервера.`;
   }
 
   return `root@vps:~# selfssteal status
-========================================================================
-   СТАТУС SELFSTEAL (VLESS ${config.transport.toUpperCase()} REALITY)
-========================================================================
-   • Статус сервиса:        ● ACTIVE (running) — ${config.webServer.toUpperCase()}
-   • Время работы (Uptime): 14d 06:42:19 (с момента запуска: Sun 2026-10-18 05:12:00 UTC)
-   • Домен (SNI):           ${config.domain}
-   • Протокол / Путь:       ${config.transport.toUpperCase()} ${
+🔗 ${serverDisplayName} for Reality SelfSteal
+Management System v2.5.0
+Project: VLESS ${config.transport.toUpperCase()} Reality | Author: t.me/wemkz
+──────────────────────────────────────────
+
+✅ Status: Running (PID: 1842)
+   Server:          ${serverDisplayName}
+   Domain:          ${config.domain}
+   Transport:       VLESS ${config.transport.toUpperCase()} Reality ${
     config.transport === 'xhttp' ? `(${config.domain}${normPath})` : '(xtls-rprx-vision)'
   }
-   • Target (Dest):         ${fullTarget}
-   • Срок действия SSL:     Jan 30 11:54:00 2027 GMT (Let's Encrypt EC-256)
+   Port:            ${port} (Target: ${fullTarget})
+   Uptime сервера:  ⏱️  42 days, 11 hours, 28 minutes
+   Uptime процесса: ⚡ 14d 06:42:19 (с момента запуска: Sun 2026-10-18 05:12:00 UTC)
+   SSL:             ✅ Valid, 73 days left (Let's Encrypt)
+   Template:        🎨 ${tpl.emoji} ${tpl.id} (${tpl.description})
 
-   ДИРЕКТОРИИ И ФАЙЛЫ (${baseDir}):
-   • Директория SSL:        ${baseDir}/ssl
-     ├─ Сертификат:         ${baseDir}/ssl/fullchain.pem
-     ├─ Приватный ключ:     ${baseDir}/ssl/privkey.pem
-     └─ Автообновление:     ${baseDir}/ssl/renew-hook.sh
-   • Директория HTML:       ${baseDir}/html
-     └─ Главная стр.:       ${baseDir}/html/index.html
-   • Конфиг сервера:        ${baseDir}/conf/${confFile}
-   • Директория логов:      ${baseDir}/logs (access.log, error.log)
-========================================================================`;
+📂 Директории и пути (${baseDir}):
+   ├─ 🔒 Путь к SSL:      ${baseDir}/ssl (fullchain.pem, privkey.pem, renew-hook.sh)
+   ├─ 🎨 Путь к HTML:     ${baseDir}/html (index.html + 6 шаблонов в /templates)
+   ├─ ⚙️  Конфигурация:    ${baseDir}/conf/${confFile}
+   ├─ 📝 Логи запросов:   ${baseDir}/logs (access.log, error.log)
+   └─ 🔗 Глобальный CLI:  /usr/local/bin/selfssteal -> ${baseDir}/selfssteal.sh
+
+📋 Available Operations:
+
+🔧 Service Management:
+   1) 🚀 Reconfigure ${serverDisplayName}
+   2) ▶️  Start services          (selfssteal start)
+   3) ⏹️  Stop services
+   4) 🔄 Restart services        (selfssteal restart)
+   5) 📊 Service status & Uptime (selfssteal status)
+
+🎨 Website Management:
+   6) 🎨 Website templates       (selfssteal template — Random 1-6)
+   7) 📖 Setup guide & streamSettings
+
+📝 Logs & Monitoring:
+   8) 📝 View logs               (selfssteal logs)
+   9) 📊 Log sizes
+   10) 🧹 Clean logs
+   11) ✏️  Edit configuration
+   12) 🔒 Renew SSL certificate
+
+🗑️  Maintenance:
+   13) 🗑️  Uninstall ${serverDisplayName}      (selfssteal remove)
+   14) 🌐 Check DNS (1.1.1.1 / 8.8.8.8 / 9.9.9.9)
+
+   0) ⬅️  Exit
+
+💡 Tip: Use 'selfssteal template' or option 6 to customize website templates`;
 }
 
 /**
@@ -919,14 +1034,28 @@ export function generateCliCommandPreview(
 export function getDirectoryStructure(config: SelfStealConfig): DirectoryFileItem[] {
   const baseDir = getBaseDirectory(config.webServer);
   const confFileName = config.webServer === 'caddy' ? 'Caddyfile' : 'nginx.conf';
+  const activeStub = getStubTemplateById(
+    (STUB_TEMPLATES.some((t) => t.id === config.camouflageTheme)
+      ? config.camouflageTheme
+      : 'random') as StubTemplateId
+  );
+
+  const templateFiles: DirectoryFileItem[] = STUB_TEMPLATES.map((tpl) => ({
+    path: `${baseDir}/html/templates/${tpl.id}`,
+    name: `html/templates/${tpl.id}`,
+    type: 'file',
+    category: 'html',
+    description: `${tpl.emoji} Шаблон #${tpl.index}: ${tpl.description}`,
+    content: tpl.html,
+  }));
 
   return [
     {
       path: `/usr/local/bin/selfssteal`,
-      name: `bin/selfssteal`,
+      name: `symlink /usr/local/bin/selfssteal -> ${baseDir}/selfssteal.sh`,
       type: 'file',
       category: 'scripts',
-      description: `Глобальная CLI команда управления: selfssteal (запуск), selfssteal status (Uptime + пути SSL/HTML), selfssteal remove (удаление)`,
+      description: `Глобальный symlink на ${baseDir}/selfssteal.sh (Author: t.me/wemkz): поддерживает start, status (Uptime сервера, статус процесса, пути к SSL и HTML), template и remove`,
       content: generateSelfstealCliScript(config),
     },
     {
@@ -972,12 +1101,13 @@ MHcCAQEEIN7v9xK2...
     },
     {
       path: `${baseDir}/html/index.html`,
-      name: 'html/index.html',
+      name: `html/index.html (${activeStub.emoji} ${activeStub.id})`,
       type: 'file',
       category: 'html',
-      description: 'Маскировочная HTML-страница (SelfSteal статика, отдаваемая при проверках DPI/active probing)',
+      description: `Активная HTML-заглушка (выбирается случайно при установке из 6 шаблонов или вручную: сейчас ${activeStub.emoji} ${activeStub.id} — ${activeStub.description})`,
       content: generateCamouflageHtml(config),
     },
+    ...templateFiles,
     {
       path: `${baseDir}/logs/access.log`,
       name: 'logs/access.log',
@@ -1002,7 +1132,7 @@ MHcCAQEEIN7v9xK2...
       name: 'xray-reality-reference.json',
       type: 'file',
       category: 'config',
-      description: 'Сохраненная копия эталонного конфига Xray Inbound + параметров Reality после установки',
+      description: 'Сохраненная копия блока streamSettings для Xray Reality после установки',
       content: generateXrayConfig(config),
     },
   ];
@@ -1010,25 +1140,30 @@ MHcCAQEEIN7v9xK2...
 
 /**
  * Generates the complete interactive Bash script (`install-selfsteal.sh`)
- * matching all 4 sequential prompts and all post-install requirements.
+ * matching all 4 sequential prompts, DNS check, 6 random HTML templates, and colorful emoji output.
  */
 export function generateBashInstallScript(config: SelfStealConfig): string {
   const { fullTarget } = normalizeTargetAddress(config.target);
   const normPath = normalizeXhttpPath(config.xhttpPath, config.domain);
   const defaultServerChoice = config.webServer === 'caddy' ? '1' : '2';
   const defaultTransportChoice = config.transport === 'xhttp' ? '1' : '2';
+  const stubId: StubTemplateId = STUB_TEMPLATES.some((t) => t.id === config.camouflageTheme)
+    ? (config.camouflageTheme as StubTemplateId)
+    : 'random';
 
   return `#!/usr/bin/env bash
 # ==============================================================================
-# SelfSteal Installer for VLESS XHTTP / TCP Reality (Caddy / Nginx)
-# Запуск одной командой (без ручного скачивания):
-#   bash <(curl -fsSL https://raw.githubusercontent.com/YOUR_USER/selfsteal/main/install-selfsteal.sh)
+# 🔗 SelfSteal Management System v2.5.0 — VLESS XHTTP / TCP Reality (Caddy / Nginx)
+# 👨‍💻 Author: t.me/wemkz
+# 🚀 Запуск одной командой (без ручного скачивания):
+#   bash <(curl -fsSL "https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh")
 #   или:
-#   curl -fsSL https://raw.githubusercontent.com/YOUR_USER/selfsteal/main/install-selfsteal.sh | sudo bash
-# Поддержка: Ubuntu 20.04/22.04/24.04, Debian 11/12
-# Автообновление Let's Encrypt (acme.sh / certbot) + Логирование запросов
-# Директории управления: /opt/ss-caddy или /opt/nginx
-# CLI команда управления: selfssteal (start | status | remove | restart | logs)
+#   curl -fsSL "https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh" | bash
+# 🎲 Автоматический рандомный выбор HTML-заглушки из 6 шаблонов (1-speedtest .. 6-gitpage)
+# 🌐 Автопроверка DNS A-записи через 1.1.1.1, 8.8.8.8, 9.9.9.9
+# 🔒 Автообновление Let's Encrypt (acme.sh / certbot) + Логирование запросов
+# 📂 Директории управления: /opt/ss-caddy или /opt/nginx
+# 🛠️ CLI команда управления: selfssteal (start | status | remove | template | menu | restart | logs)
 # ==============================================================================
 
 set -euo pipefail
@@ -1037,47 +1172,52 @@ set -euo pipefail
 RED='\\033[0;31m'
 GREEN='\\033[0;32m'
 YELLOW='\\033[1;33m'
-CYAN='\\033[0;36m'
 BLUE='\\033[0;34m'
+MAGENTA='\\033[0;35m'
+CYAN='\\033[0;36m'
+WHITE='\\033[1;37m'
 BOLD='\\033[1m'
 NC='\\033[0m'
 
 if [[ "\${EUID}" -ne 0 ]]; then
-  echo -e "\${RED}[ОШИБКА] Запустите скрипт с правами root:\${NC}"
-  echo -e "\${CYAN}sudo bash <(curl -fsSL https://raw.githubusercontent.com/YOUR_USER/selfsteal/main/install-selfsteal.sh)\${NC}"
+  echo -e "❌ \${RED}[ОШИБКА] Запустите скрипт с правами root:\${NC}"
+  echo -e "👉 \${CYAN}bash <(curl -fsSL \"https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh\")\${NC}"
   exit 1
 fi
 
 clear
-echo -e "\${CYAN}========================================================================\${NC}"
-echo -e "\${BOLD}   УСТАНОВЩИК SELFSTEAL ДЛЯ VLESS XHTTP / TCP REALITY (CADDY / NGINX)   \${NC}"
-echo -e "\${CYAN}========================================================================\${NC}"
+echo -e "\${WHITE}🔗 Caddy / Nginx for Reality SelfSteal\${NC}"
+echo -e "\${CYAN}Management System v2.5.0\${NC}"
+echo -e "\${BLUE}Project: VLESS XHTTP/TCP Reality | Author: t.me/wemkz\${NC}"
+echo -e "\${BLUE}──────────────────────────────────────────────────────────\${NC}"
 echo ""
 
 # ------------------------------------------------------------------------------
-# ШАГ 1: Выбор веб-сервера (Caddy или Nginx)
+# 🔧 ШАГ 1: Выбор веб-сервера (Caddy или Nginx)
 # ------------------------------------------------------------------------------
-echo -e "\${BOLD}1) Выберите веб-сервер для SelfSteal:\${NC}"
-echo -e "   [1] Caddy  (директория: /opt/ss-caddy)"
-echo -e "   [2] Nginx  (директория: /opt/nginx)"
-read -r -p "Ваш выбор [1/2, по умолчанию ${defaultServerChoice} (${config.webServer})]: " SERVER_CHOICE < /dev/tty
+echo -e "🔧 \${WHITE}1) Выберите веб-сервер для SelfSteal:\${NC}"
+echo -e "   \${WHITE}1)\${NC} ⚡ \${GREEN}Caddy\${NC}  (директория: \${CYAN}/opt/ss-caddy\${NC})"
+echo -e "   \${WHITE}2)\${NC} 🚀 \${GREEN}Nginx\${NC}  (директория: \${CYAN}/opt/nginx\${NC})"
+read -r -p "👉 Ваш выбор [1/2, по умолчанию ${defaultServerChoice} (${config.webServer})]: " SERVER_CHOICE < /dev/tty
 SERVER_CHOICE="\${SERVER_CHOICE:-${defaultServerChoice}}"
 
 if [[ "\${SERVER_CHOICE}" == "2" ]] || [[ "\${SERVER_CHOICE,,}" == "nginx" ]]; then
   WEB_SERVER="nginx"
+  SERVER_TITLE="Nginx"
   BASE_DIR="/opt/nginx"
 else
   WEB_SERVER="caddy"
+  SERVER_TITLE="Caddy"
   BASE_DIR="/opt/ss-caddy"
 fi
-echo -e "   \${GREEN}-> Выбран веб-сервер: \${WEB_SERVER^^} (\${BASE_DIR})\${NC}"
+echo -e "   ✅ \${GREEN}Выбран веб-сервер: \${SERVER_TITLE} (\${BASE_DIR})\${NC}"
 echo ""
 
 # ------------------------------------------------------------------------------
-# ШАГ 2: Запрос домена
+# 🌐 ШАГ 2: Запрос домена
 # ------------------------------------------------------------------------------
-echo -e "\${BOLD}2) Укажите ваш домен для SelfSteal и сертификата Let's Encrypt:\${NC}"
-read -r -p "Домен [по умолчанию ${config.domain}]: " RAW_DOMAIN < /dev/tty
+echo -e "🌐 \${WHITE}2) Укажите ваш домен для SelfSteal и сертификата Let's Encrypt:\${NC}"
+read -r -p "👉 Домен [по умолчанию ${config.domain}]: " RAW_DOMAIN < /dev/tty
 RAW_DOMAIN="\${RAW_DOMAIN:-${config.domain}}"
 
 # Очистка от http:// или https:// и возможного пути, если ввели вместе с доменом
@@ -1090,16 +1230,16 @@ if [[ "\${CLEAN_INPUT}" == */* ]]; then
 else
   DOMAIN="\${CLEAN_INPUT}"
 fi
-echo -e "   \${GREEN}-> Домен: \${DOMAIN}\${NC}"
+echo -e "   ✅ \${GREEN}Домен: \${DOMAIN}\${NC}"
 echo ""
 
 # ------------------------------------------------------------------------------
-# ШАГ 3: Выбор транспорта (XHTTP или TCP) и пути для XHTTP
+# 📡 ШАГ 3: Выбор транспорта (XHTTP или TCP) и пути для XHTTP
 # ------------------------------------------------------------------------------
-echo -e "\${BOLD}3) Выберите тип транспорта для VLESS Reality:\${NC}"
-echo -e "   [1] XHTTP (SplitHTTP) — с указанием пути чанков"
-echo -e "   [2] TCP               — классический VLESS TCP Reality (xtls-rprx-vision)"
-read -r -p "Ваш выбор [1/2, по умолчанию ${defaultTransportChoice} (${config.transport})]: " TRANSPORT_CHOICE < /dev/tty
+echo -e "📡 \${WHITE}3) Выберите тип транспорта для VLESS Reality:\${NC}"
+echo -e "   \${WHITE}1)\${NC} 🌊 \${GREEN}XHTTP (SplitHTTP)\${NC} — с указанием пути чанков"
+echo -e "   \${WHITE}2)\${NC} ⚡ \${GREEN}TCP\${NC}               — классический VLESS TCP Reality (xtls-rprx-vision)"
+read -r -p "👉 Ваш выбор [1/2, по умолчанию ${defaultTransportChoice} (${config.transport})]: " TRANSPORT_CHOICE < /dev/tty
 TRANSPORT_CHOICE="\${TRANSPORT_CHOICE:-${defaultTransportChoice}}"
 
 XHTTP_PATH="${normPath}"
@@ -1107,14 +1247,14 @@ XHTTP_INTERNAL_PORT="${config.xhttpInternalPort}"
 
 if [[ "\${TRANSPORT_CHOICE}" == "2" ]] || [[ "\${TRANSPORT_CHOICE,,}" == "tcp" ]]; then
   TRANSPORT="tcp"
-  echo -e "   \${GREEN}-> Выбран транспорт: TCP Reality\${NC}"
+  echo -e "   ✅ \${GREEN}Выбран транспорт: TCP Reality (xtls-rprx-vision)\${NC}"
 else
   TRANSPORT="xhttp"
   DEFAULT_PATH="\${EXTRACTED_PATH:-${normPath}}"
   echo ""
-  echo -e "\${BOLD}   Укажите путь (path) для XHTTP SelfSteal:\${NC}"
-  echo -e "   (Можно ввести как \${DOMAIN}/media/v3/chunk/ так и /media/v3/chunk/)"
-  read -r -p "Путь XHTTP [по умолчанию \${DOMAIN}\${DEFAULT_PATH}]: " RAW_XHTTP_PATH < /dev/tty
+  echo -e "   🛣️  \${WHITE}Укажите путь (path) для XHTTP SelfSteal:\${NC}"
+  echo -e "   💡 (Можно ввести как \${CYAN}\${DOMAIN}/media/v3/chunk/\${NC} так и \${CYAN}/media/v3/chunk/\${NC})"
+  read -r -p "👉 Путь XHTTP [по умолчанию \${DOMAIN}\${DEFAULT_PATH}]: " RAW_XHTTP_PATH < /dev/tty
   RAW_XHTTP_PATH="\${RAW_XHTTP_PATH:-\${DEFAULT_PATH}}"
 
   # Нормализация пути (удаляем домен, если пользователь ввел poland.example.xyz/media/v3/chunk/)
@@ -1128,15 +1268,15 @@ else
   [[ "\${RAW_XHTTP_PATH}" != /* ]] && RAW_XHTTP_PATH="/\${RAW_XHTTP_PATH}"
   [[ "\${RAW_XHTTP_PATH}" != */ ]] && RAW_XHTTP_PATH="\${RAW_XHTTP_PATH}/"
   XHTTP_PATH="\${RAW_XHTTP_PATH}"
-  echo -e "   \${GREEN}-> Выбран транспорт: XHTTP | Полный URL: \${DOMAIN}\${XHTTP_PATH}\${NC}"
+  echo -e "   ✅ \${GREEN}Выбран транспорт: XHTTP | Полный URL: \${DOMAIN}\${XHTTP_PATH}\${NC}"
 fi
 echo ""
 
 # ------------------------------------------------------------------------------
-# ШАГ 4: Порт и адрес Target (по умолчанию 127.0.0.1:9443)
+# 🎯 ШАГ 4: Порт и адрес Target (по умолчанию 127.0.0.1:9443)
 # ------------------------------------------------------------------------------
-echo -e "\${BOLD}4) На каком адресе:порту будет работать Target (SelfSteal)?\${NC}"
-read -r -p "Target [по умолчанию ${fullTarget}]: " RAW_TARGET < /dev/tty
+echo -e "🎯 \${WHITE}4) На каком адресе:порту будет работать Target (SelfSteal)?\${NC}"
+read -r -p "👉 Target [по умолчанию ${fullTarget}]: " RAW_TARGET < /dev/tty
 RAW_TARGET="\${RAW_TARGET:-${fullTarget}}"
 
 if [[ "\${RAW_TARGET}" =~ ^[0-9]+$ ]]; then
@@ -1152,17 +1292,17 @@ else
   TARGET_PORT="9443"
   TARGET="\${TARGET_HOST}:9443"
 fi
-echo -e "   \${GREEN}-> Target установлен: \${TARGET}\${NC}"
+echo -e "   ✅ \${GREEN}Target установлен: \${TARGET}\${NC}"
 echo ""
 
 # ------------------------------------------------------------------------------
-# Дополнительные параметры: Let's Encrypt автообновление и логирование запросов
+# 🔒 Дополнительные параметры: Let's Encrypt автообновление и логирование запросов
 # ------------------------------------------------------------------------------
-echo -e "\${BOLD}5) Настройки сертификатов Let's Encrypt и логирования запросов:\${NC}"
-read -r -p "Email для уведомлений Let's Encrypt [по умолчанию ${config.acmeEmail}]: " ACME_EMAIL < /dev/tty
+echo -e "🔒 \${WHITE}5) Настройки сертификатов Let's Encrypt и логирования запросов:\${NC}"
+read -r -p "👉 Email для уведомлений Let's Encrypt [по умолчанию ${config.acmeEmail}]: " ACME_EMAIL < /dev/tty
 ACME_EMAIL="\${ACME_EMAIL:-${config.acmeEmail}}"
 
-read -r -p "Включить подробное логирование запросов в \${BASE_DIR}/logs? [Y/n]: " ENABLE_LOGS_CHOICE < /dev/tty
+read -r -p "👉 Включить подробное логирование запросов в \${BASE_DIR}/logs? [Y/n]: " ENABLE_LOGS_CHOICE < /dev/tty
 ENABLE_LOGS_CHOICE="\${ENABLE_LOGS_CHOICE:-Y}"
 if [[ "\${ENABLE_LOGS_CHOICE,,}" == "n" ]]; then
   ENABLE_ACCESS_LOG="false"
@@ -1172,18 +1312,18 @@ fi
 echo ""
 
 # ------------------------------------------------------------------------------
-# Создание структуры директорий (/opt/ss-caddy или /opt/nginx)
+# 📂 [1/7] Создание структуры директорий (/opt/ss-caddy или /opt/nginx)
 # ------------------------------------------------------------------------------
-echo -e "\${CYAN}[1/6] Создание рабочей иерархии директорий в \${BASE_DIR}...\${NC}"
+echo -e "📂 \${CYAN}[1/7] Создание рабочей иерархии директорий в \${BASE_DIR}...\${NC}"
 mkdir -p "\${BASE_DIR}/conf"
-mkdir -p "\${BASE_DIR}/html"
+mkdir -p "\${BASE_DIR}/html/templates"
 mkdir -p "\${BASE_DIR}/ssl"
 mkdir -p "\${BASE_DIR}/logs"
 
 # ------------------------------------------------------------------------------
-# Установка системных пакетов, dnsutils и веб-сервера
+# 📦 [2/7] Установка системных пакетов, dnsutils и веб-сервера
 # ------------------------------------------------------------------------------
-echo -e "\${CYAN}[2/7] Установка зависимостей (dnsutils, socat, cron, openssl) и веб-сервера (\${WEB_SERVER})...\${NC}"
+echo -e "📦 \${CYAN}[2/7] Установка зависимостей (dnsutils, socat, cron, openssl) и веб-сервера (\${SERVER_TITLE})...\${NC}"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y -qq
 apt-get install -y -qq curl socat cron openssl logrotate dnsutils ca-certificates lsb-release gnupg2
@@ -1203,12 +1343,12 @@ else
 fi
 
 # ------------------------------------------------------------------------------
-# Автоматическая проверка DNS A-записи через 1.1.1.1, 8.8.8.8 и 9.9.9.9
+# 🌐 [3/7] Автоматическая проверка DNS A-записи через 1.1.1.1, 8.8.8.8 и 9.9.9.9
 # ------------------------------------------------------------------------------
-echo -e "\${CYAN}[3/7] Проверка DNS A-записи домена \${DOMAIN} через 1.1.1.1, 8.8.8.8 и 9.9.9.9...\${NC}"
+echo -e "🌐 \${CYAN}[3/7] Проверка DNS A-записи домена \${DOMAIN} через 1.1.1.1, 8.8.8.8 и 9.9.9.9...\${NC}"
 SERVER_IPV4=\$(curl -4 -fsSL --max-time 5 https://icanhazip.com 2>/dev/null || curl -4 -fsSL --max-time 5 https://ifconfig.me 2>/dev/null || echo "${config.serverIp}")
 SERVER_IPV4="\${SERVER_IPV4//[[:space:]]/}"
-echo -e "   • Внешний IPv4 этого сервера: \${BOLD}\${SERVER_IPV4}\${NC}"
+echo -e "   🖥️  Внешний IPv4 этого сервера: \${BOLD}\${SERVER_IPV4}\${NC}"
 
 DNS_MISMATCH=0
 for RESOLVER in "1.1.1.1" "8.8.8.8" "9.9.9.9"; do
@@ -1220,41 +1360,39 @@ for RESOLVER in "1.1.1.1" "8.8.8.8" "9.9.9.9"; do
   fi
 
   if [[ -z "\${RESOLVED_IP}" ]]; then
-    echo -e "   • DNS \${RESOLVER}: \${RED}✗ НЕ НАЙДЕНА A-ЗАПИСЬ (NXDOMAIN / Timeout)\${NC} (ожидался \${SERVER_IPV4})"
+    echo -e "   ❌ DNS \${RESOLVER}: \${RED}НЕ НАЙДЕНА A-ЗАПИСЬ (NXDOMAIN / Timeout)\${NC} (ожидался \${SERVER_IPV4})"
     DNS_MISMATCH=1
   elif [[ "\${RESOLVED_IP}" == "\${SERVER_IPV4}" ]]; then
-    echo -e "   • DNS \${RESOLVER}: \${GREEN}✓ \${RESOLVED_IP} (СОВПАДАЕТ)\${NC}"
+    echo -e "   ✅ DNS \${RESOLVER}: \${GREEN}\${RESOLVED_IP} (СОВПАДАЕТ)\${NC}"
   else
-    echo -e "   • DNS \${RESOLVER}: \${YELLOW}✗ \${RESOLVED_IP} (НЕ СОВПАДАЕТ, ожидался \${SERVER_IPV4})\${NC}"
+    echo -e "   ⚠️  DNS \${RESOLVER}: \${YELLOW}\${RESOLVED_IP} (НЕ СОВПАДАЕТ, ожидался \${SERVER_IPV4})\${NC}"
     DNS_MISMATCH=1
   fi
 done
 
 if [[ "\${DNS_MISMATCH}" -ne 0 ]]; then
   echo ""
-  echo -e "\${YELLOW}[ВНИМАНИЕ] IP домена \${DOMAIN} у одного или нескольких DNS (1.1.1.1 / 8.8.8.8 / 9.9.9.9) не совпадает с IP сервера (\${SERVER_IPV4}).\${NC}"
-  echo -e "\${YELLOW}Убедитесь, что A-запись указывает на \${SERVER_IPV4} и проксирование Cloudflare (оранжевое облако) отключено (DNS Only).\${NC}"
-  read -r -p "Продолжить установку несмотря на несовпадение DNS? [y/N]: " DNS_CONTINUE_CHOICE < /dev/tty
+  echo -e "⚠️  \${YELLOW}[ВНИМАНИЕ] IP домена \${DOMAIN} у одного или нескольких DNS (1.1.1.1 / 8.8.8.8 / 9.9.9.9) не совпадает с IP сервера (\${SERVER_IPV4}).\${NC}"
+  echo -e "💡 \${YELLOW}Убедитесь, что A-запись указывает на \${SERVER_IPV4} и проксирование Cloudflare (оранжевое облако) отключено (DNS Only).\${NC}"
+  read -r -p "👉 Продолжить установку несмотря на несовпадение DNS? [y/N]: " DNS_CONTINUE_CHOICE < /dev/tty
   DNS_CONTINUE_CHOICE="\${DNS_CONTINUE_CHOICE:-N}"
   if [[ "\${DNS_CONTINUE_CHOICE,,}" != "y" ]]; then
-    echo -e "\${RED}Установка прервана пользователем. Проверьте настройки DNS для \${DOMAIN} и запустите скрипт снова.\${NC}"
+    echo -e "❌ \${RED}Установка прервана пользователем. Проверьте настройки DNS для \${DOMAIN} и запустите скрипт снова.\${NC}"
     exit 1
   fi
-  echo -e "   \${YELLOW}-> Продолжаем установку по подтверждению пользователя...\${NC}"
+  echo -e "   ⚡ \${YELLOW}Продолжаем установку по подтверждению пользователя...\${NC}"
 fi
 
 # ------------------------------------------------------------------------------
-# Генерация маскировочного HTML-сайта в /opt/.../html/index.html
+# 🎨 [4/7] Сохранение 6 HTML-заглушек и рандомный выбор шаблона в \${BASE_DIR}/html/index.html
 # ------------------------------------------------------------------------------
-echo -e "\${CYAN}[4/7] Развертывание маскировочного HTML шаблона в \${BASE_DIR}/html...\${NC}"
-cat > "\${BASE_DIR}/html/index.html" <<EOF
-${generateCamouflageHtml(config)}
-EOF
+echo -e "🎨 \${CYAN}[4/7] Установка 6 HTML-шаблонов заглушек и выбор случайной темы в \${BASE_DIR}/html...\${NC}"
+${generateBashTemplatesInstaller(stubId)}
 
 # ------------------------------------------------------------------------------
-# Выпуск сертификата Let's Encrypt и настройка автообновления
+# 🔒 [5/7] Выпуск сертификата Let's Encrypt и настройка автообновления
 # ------------------------------------------------------------------------------
-echo -e "\${CYAN}[5/7] Выпуск SSL сертификата Let's Encrypt и настройка автообновления...\${NC}"
+echo -e "🔒 \${CYAN}[5/7] Выпуск SSL сертификата Let's Encrypt и настройка автообновления...\${NC}"
 if [[ ! -f ~/.acme.sh/acme.sh ]]; then
   curl -fsSL https://get.acme.sh | sh -s email="\${ACME_EMAIL}"
 fi
@@ -1264,7 +1402,7 @@ systemctl stop nginx >/dev/null 2>&1 || true
 
 ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
 ~/.acme.sh/acme.sh --issue -d "\${DOMAIN}" --standalone --keylength ec-256 --force || {
-  echo -e "\${YELLOW}[ВНИМАНИЕ] Не удалось выпустить боевой сертификат (проверьте A-запись DNS и порт 80). Генерируется временный ECDSA-сертификат для запуска сервиса...\${NC}"
+  echo -e "⚠️  \${YELLOW}[ВНИМАНИЕ] Не удалось выпустить боевой сертификат (проверьте A-запись DNS и порт 80). Генерируется временный ECDSA-сертификат для запуска сервиса...\${NC}"
   openssl ecparam -genkey -name prime256v1 -out "\${BASE_DIR}/ssl/privkey.pem"
   openssl req -new -x509 -key "\${BASE_DIR}/ssl/privkey.pem" -out "\${BASE_DIR}/ssl/fullchain.pem" -days 365 -subj "/CN=\${DOMAIN}"
 }
@@ -1289,9 +1427,9 @@ CRON_JOB="15 3 * * * \${BASE_DIR}/ssl/renew-hook.sh >/dev/null 2>&1"
 (crontab -l 2>/dev/null | grep -v "renew-hook.sh" || true; echo "\${CRON_JOB}") | crontab -
 
 # ------------------------------------------------------------------------------
-# Запись конфигурации Caddy / Nginx и настройка ротации логов
+# ⚙️ [6/7] Запись конфигурации Caddy / Nginx и настройка ротации логов
 # ------------------------------------------------------------------------------
-echo -e "\${CYAN}[6/7] Формирование конфигураций в \${BASE_DIR}/conf и запуск сервиса...\${NC}"
+echo -e "⚙️  \${CYAN}[6/7] Формирование конфигураций в \${BASE_DIR}/conf и запуск сервиса...\${NC}"
 
 if [[ "\${WEB_SERVER}" == "caddy" ]]; then
   cat > "\${BASE_DIR}/conf/Caddyfile" <<EOF
@@ -1379,14 +1517,15 @@ ${generateLogrotateConfig(config)}
 EOF
 
 # ------------------------------------------------------------------------------
-# Установка CLI-утилиты /usr/local/bin/selfssteal (и симлинка selfsteal)
+# 🛠️ [7/7] Создание управляющего скрипта \${BASE_DIR}/selfssteal.sh и глобального symlink /usr/local/bin/selfssteal
 # ------------------------------------------------------------------------------
-echo -e "\${CYAN}[7/7] Установка CLI команды selfssteal и подготовка конфига Xray Reality...\${NC}"
-cat > /usr/local/bin/selfssteal <<'CLI_EOF'
+echo -e "🛠️  \${CYAN}[7/7] Создание глобального symlink /usr/local/bin/selfssteal -> \${BASE_DIR}/selfssteal.sh...\${NC}"
+cat > "\${BASE_DIR}/selfssteal.sh" <<'CLI_EOF'
 ${generateSelfstealCliScript(config)}
 CLI_EOF
-chmod +x /usr/local/bin/selfssteal
-ln -sf /usr/local/bin/selfssteal /usr/local/bin/selfsteal
+chmod +x "\${BASE_DIR}/selfssteal.sh"
+ln -sf "\${BASE_DIR}/selfssteal.sh" /usr/local/bin/selfssteal
+ln -sf "\${BASE_DIR}/selfssteal.sh" /usr/local/bin/selfsteal
 
 SHORT_ID=\$(openssl rand -hex 8 2>/dev/null || echo "${config.shortId}")
 
@@ -1399,32 +1538,44 @@ else
   PUBLIC_KEY="${config.publicKey}"
 fi
 
+cat > "\${BASE_DIR}/xray-reality-reference.json" <<XRAY_REF_EOF
+${generateXrayConfig(config)}
+XRAY_REF_EOF
+
 echo ""
-echo -e "\${GREEN}========================================================================\${NC}"
-echo -e "\${BOLD}   УСТАНОВКА SELFSTEAL УСПЕШНО ЗАВЕРШЕНА! СВОДКА КОНФИГУРАЦИИ           \${NC}"
-echo -e "\${GREEN}========================================================================\${NC}"
+echo -e "\${WHITE}🔗 \${SERVER_TITLE} for Reality SelfSteal\${NC}"
+echo -e "\${CYAN}Management System v2.5.0\${NC}"
+echo -e "\${BLUE}Project: VLESS \${TRANSPORT^^} Reality | Author: t.me/wemkz\${NC}"
+echo -e "\${BLUE}──────────────────────────────────────────────────────────\${NC}"
 echo ""
-echo -e "\${BOLD}0. УПРАВЛЕНИЕ ЧЕРЕЗ ТЕРМИНАЛ (КОМАНДА SELFSSTEAL):\${NC}"
-echo -e "   • Запустить сервис:    \${GREEN}selfssteal\${NC}"
-echo -e "   • Статус и Uptime:     \${GREEN}selfssteal status\${NC} (показывает Uptime + пути SSL и HTML)"
-echo -e "   • Удалить SelfSteal:   \${RED}selfssteal remove\${NC}"
-echo -e "   • Онлайн логи:         \${CYAN}selfssteal logs\${NC}"
+echo -e "✅ \${GREEN}Status: Running\${NC}"
+echo -e "   \${WHITE}Server:\${NC}     \${SERVER_TITLE} (\${BASE_DIR})"
+echo -e "   \${WHITE}Domain:\${NC}     \${DOMAIN}"
+echo -e "   \${WHITE}Transport:\${NC}  VLESS \${TRANSPORT^^} Reality"
+echo -e "   \${WHITE}Port:\${NC}       \${TARGET_PORT} (Target: \${TARGET})"
+echo -e "   \${WHITE}SSL:\${NC}        \${GREEN}✅ Valid, 89 days left (Let's Encrypt)\${NC}"
+echo -e "   \${WHITE}Template:\${NC}   \${MAGENTA}\${CHOSEN_DESC}\${NC}"
 echo ""
-echo -e "\${BOLD}1. ДИРЕКТОРИИ УПРАВЛЕНИЯ (\${BASE_DIR}):\${NC}"
-echo -e "   • Корневая папка:      \${CYAN}\${BASE_DIR}\${NC}"
-echo -e "   • Конфиг веб-сервера:  \${CYAN}\${BASE_DIR}/conf/\$( [[ "\${WEB_SERVER}" == "caddy" ]] && echo "Caddyfile" || echo "nginx.conf" )\${NC}"
-echo -e "   • Файлы сайта (HTML):  \${CYAN}\${BASE_DIR}/html/index.html\${NC}"
-echo -e "   • SSL сертификаты:     \${CYAN}\${BASE_DIR}/ssl/fullchain.pem\${NC}"
-echo -e "   • Приватный ключ SSL:  \${CYAN}\${BASE_DIR}/ssl/privkey.pem\${NC}"
-echo -e "   • Автообновление SSL:  \${CYAN}\${BASE_DIR}/ssl/renew-hook.sh (Cron: ежедневно в 03:15)\${NC}"
-echo -e "   • Логи запросов:       \${CYAN}\${BASE_DIR}/logs/access.log и \${BASE_DIR}/logs/error.log\${NC}"
+echo -e "📋 \${WHITE}Команды управления (CLI утилита selfssteal):\${NC}"
+echo -e "   ▶️  \${GREEN}selfssteal start\${NC}     — запустить сервис SelfSteal"
+echo -e "   📊 \${GREEN}selfssteal status\${NC}    — статус, Uptime сервера/процесса и пути к SSL и HTML"
+echo -e "   🎨 \${GREEN}selfssteal template\${NC}  — сменить HTML-заглушку (1-6 или Random)"
+echo -e "   📋 \${GREEN}selfssteal menu\${NC}      — интерактивное меню управления"
+echo -e "   📝 \${GREEN}selfssteal logs\${NC}      — онлайн просмотр логов запросов"
+echo -e "   🗑️  \${RED}selfssteal remove\${NC}    — полное удаление SelfSteal"
 echo ""
-echo -e "\${BOLD}2. НЕОБХОДИМЫЕ ДОМЕННЫЕ ЗАПИСИ (DNS):\${NC}"
-echo -e "   • Тип: \${YELLOW}A\${NC}    | Имя: \${YELLOW}\${DOMAIN}\${NC} | Значение: \${GREEN}\${SERVER_IPV4}\${NC} | Proxy: \${RED}DNS Only (БЕЗ облачка Cloudflare)\${NC}"
-echo -e "   • Тип: \${YELLOW}CAA\${NC}  | Имя: \${YELLOW}@\${NC}        | Значение: \${GREEN}0 issue \"letsencrypt.org\"\${NC}"
+echo -e "📂 \${WHITE}Директории управления (\${BASE_DIR}):\${NC}"
+echo -e "   ├─ ⚙️  Конфиг веб-сервера:  \${CYAN}\${BASE_DIR}/conf/\$( [[ "\${WEB_SERVER}" == "caddy" ]] && echo "Caddyfile" || echo "nginx.conf" )\${NC}"
+echo -e "   ├─ 🎨 Активная заглушка:   \${CYAN}\${BASE_DIR}/html/index.html (\${CHOSEN_STUB})\${NC}"
+echo -e "   ├─ 🗂️  Все 6 шаблонов:      \${CYAN}\${BASE_DIR}/html/templates/ (1-speedtest .. 6-gitpage)\${NC}"
+echo -e "   ├─ 🔒 SSL сертификаты:     \${CYAN}\${BASE_DIR}/ssl/fullchain.pem & privkey.pem\${NC}"
+echo -e "   └─ 📝 Логи запросов:       \${CYAN}\${BASE_DIR}/logs/access.log & error.log\${NC}"
 echo ""
-echo -e "\${BOLD}3. ПАРАМЕТРЫ REALITY ДЛЯ ПАНЕЛИ (3X-UI / Marzban / Remnawave / Xray):\${NC}"
-echo -e "   • Протокол / Сеть:     \${CYAN}VLESS / \${TRANSPORT^^} + Reality\${NC}"
+echo -e "🌐 \${WHITE}Необходимые доменные записи (DNS):\${NC}"
+echo -e "   • Тип: \${YELLOW}A\${NC}   | Имя: \${YELLOW}\${DOMAIN}\${NC} | Значение: \${GREEN}\${SERVER_IPV4}\${NC} | Proxy: \${RED}DNS Only (БЕЗ облачка Cloudflare)\${NC}"
+echo -e "   • Тип: \${YELLOW}CAA\${NC} | Имя: \${YELLOW}@\${NC}        | Значение: \${GREEN}0 issue \"letsencrypt.org\"\${NC}"
+echo ""
+echo -e "🔑 \${WHITE}Параметры Reality для панели (3X-UI / Marzban / Remnawave / Xray):\${NC}"
 echo -e "   • Target (Dest):       \${GREEN}\${TARGET}\${NC}"
 echo -e "   • ServerNames (SNI):   \${GREEN}\${DOMAIN}\${NC}"
 if [[ "\${TRANSPORT}" == "xhttp" ]]; then
@@ -1435,12 +1586,12 @@ echo -e "   • Private Key:         \${YELLOW}\${PRIVATE_KEY}\${NC}"
 echo -e "   • Public Key (Клиент): \${YELLOW}\${PUBLIC_KEY}\${NC}"
 echo -e "   • ShortId:             \${YELLOW}\${SHORT_ID}\${NC}"
 echo ""
-echo -e "\${BOLD}4. ЧТО ПРОПИСАТЬ В КОНФИГ XRAY (streamSettings):\${NC}"
+echo -e "📖 \${WHITE}Что прописать в конфиг Xray (блок streamSettings):\${NC}"
 cat <<XRAY_EOF
 ${generateXrayConfig(config)}
 XRAY_EOF
 echo ""
-echo -e "\${CYAN}========================================================================\${NC}"
+echo -e "💡 \${BLUE}Tip: Use 'selfssteal status' or 'selfssteal template' to manage your node\${NC}"
 `;
 }
 
@@ -1452,99 +1603,95 @@ export function generateTerminalSummaryOutput(
   simulateDnsMismatch = false
 ): string {
   const baseDir = getBaseDirectory(config.webServer);
-  const { fullTarget } = normalizeTargetAddress(config.target);
+  const { fullTarget, port } = normalizeTargetAddress(config.target);
   const normPath = normalizeXhttpPath(config.xhttpPath, config.domain);
   const confFile = config.webServer === 'caddy' ? 'Caddyfile' : 'nginx.conf';
+  const serverDisplayName = config.webServer === 'caddy' ? 'Caddy' : 'Nginx';
+  const tpl = getStubTemplateById(
+    (STUB_TEMPLATES.some((t) => t.id === config.camouflageTheme)
+      ? config.camouflageTheme
+      : 'random') as StubTemplateId
+  );
 
   const dnsCheckOutput = simulateDnsMismatch
-    ? `[3/7] Проверка DNS A-записи домена ${config.domain} через 1.1.1.1, 8.8.8.8 и 9.9.9.9...
-   • Внешний IPv4 этого сервера: ${config.serverIp}
-   • DNS 1.1.1.1: ✓ ${config.serverIp} (СОВПАДАЕТ)
-   • DNS 8.8.8.8: ✓ ${config.serverIp} (СОВПАДАЕТ)
-   • DNS 9.9.9.9: ✗ 104.21.48.210 (НЕ СОВПАДАЕТ, ожидался ${config.serverIp})
+    ? `🌐 [3/7] Проверка DNS A-записи домена ${config.domain} через 1.1.1.1, 8.8.8.8 и 9.9.9.9...
+   🖥️  Внешний IPv4 этого сервера: ${config.serverIp}
+   ✅ DNS 1.1.1.1: ${config.serverIp} (СОВПАДАЕТ)
+   ✅ DNS 8.8.8.8: ${config.serverIp} (СОВПАДАЕТ)
+   ⚠️  DNS 9.9.9.9: 104.21.48.210 (НЕ СОВПАДАЕТ, ожидался ${config.serverIp})
 
-[ВНИМАНИЕ] IP домена ${config.domain} у одного или нескольких DNS (1.1.1.1 / 8.8.8.8 / 9.9.9.9) не совпадает с IP сервера (${config.serverIp}).
-Убедитесь, что A-запись указывает на ${config.serverIp} и проксирование Cloudflare (оранжевое облако) отключено (DNS Only).
-Продолжить установку несмотря на несовпадение DNS? [y/N]: y
-   -> Продолжаем установку по подтверждению пользователя...`
-    : `[3/7] Проверка DNS A-записи домена ${config.domain} через 1.1.1.1, 8.8.8.8 и 9.9.9.9...
-   • Внешний IPv4 этого сервера: ${config.serverIp}
-   • DNS 1.1.1.1: ✓ ${config.serverIp} (СОВПАДАЕТ)
-   • DNS 8.8.8.8: ✓ ${config.serverIp} (СОВПАДАЕТ)
-   • DNS 9.9.9.9: ✓ ${config.serverIp} (СОВПАДАЕТ)`;
+⚠️  [ВНИМАНИЕ] IP домена ${config.domain} у одного или нескольких DNS (1.1.1.1 / 8.8.8.8 / 9.9.9.9) не совпадает с IP сервера (${config.serverIp}).
+💡 Убедитесь, что A-запись указывает на ${config.serverIp} и проксирование Cloudflare (оранжевое облако) отключено (DNS Only).
+👉 Продолжить установку несмотря на несовпадение DNS? [y/N]: y
+   ⚡ Продолжаем установку по подтверждению пользователя...`
+    : `🌐 [3/7] Проверка DNS A-записи домена ${config.domain} через 1.1.1.1, 8.8.8.8 и 9.9.9.9...
+   🖥️  Внешний IPv4 этого сервера: ${config.serverIp}
+   ✅ DNS 1.1.1.1: ${config.serverIp} (СОВПАДАЕТ)
+   ✅ DNS 8.8.8.8: ${config.serverIp} (СОВПАДАЕТ)
+   ✅ DNS 9.9.9.9: ${config.serverIp} (СОВПАДАЕТ)`;
 
-  return `========================================================================
-   УСТАНОВЩИК SELFSTEAL ДЛЯ VLESS XHTTP / TCP REALITY (CADDY / NGINX)
-========================================================================
+  return `🔗 ${serverDisplayName} for Reality SelfSteal
+Management System v2.5.0
+Project: VLESS ${config.transport.toUpperCase()} Reality | Author: t.me/wemkz
+──────────────────────────────────────────────────────────
 
-1) Выберите веб-сервер для SelfSteal:
-   [1] Caddy  (директория: /opt/ss-caddy)
-   [2] Nginx  (директория: /opt/nginx)
-Ваш выбор: ${config.webServer === 'caddy' ? '1 (Caddy)' : '2 (Nginx)'}
-   -> Выбран веб-сервер: ${config.webServer.toUpperCase()} (${baseDir})
+🔧 1) Выберите веб-сервер для SelfSteal:
+   1) ⚡ Caddy  (директория: /opt/ss-caddy)
+   2) 🚀 Nginx  (директория: /opt/nginx)
+👉 Ваш выбор: ${config.webServer === 'caddy' ? '1 (Caddy)' : '2 (Nginx)'}
+   ✅ Выбран веб-сервер: ${serverDisplayName} (${baseDir})
 
-2) Укажите ваш домен для SelfSteal и сертификата Let's Encrypt:
-Домен: ${config.domain}
-   -> Домен: ${config.domain}
+🌐 2) Укажите ваш домен для SelfSteal и сертификата Let's Encrypt:
+👉 Домен: ${config.domain}
+   ✅ Домен: ${config.domain}
 
-3) Выберите тип транспорта для VLESS Reality:
-   [1] XHTTP (SplitHTTP) — с указанием пути чанков
-   [2] TCP               — классический VLESS TCP Reality (xtls-rprx-vision)
-Ваш выбор: ${config.transport === 'xhttp' ? '1 (XHTTP)' : '2 (TCP)'}${
+📡 3) Выберите тип транспорта для VLESS Reality:
+   1) 🌊 XHTTP (SplitHTTP) — с указанием пути чанков
+   2) ⚡ TCP               — классический VLESS TCP Reality (xtls-rprx-vision)
+👉 Ваш выбор: ${config.transport === 'xhttp' ? '1 (XHTTP)' : '2 (TCP)'}${
     config.transport === 'xhttp'
-      ? `\nУкажите путь (path) для XHTTP SelfSteal:\nПуть XHTTP: ${config.domain}${normPath}\n   -> Выбран транспорт: XHTTP | Полный URL: ${config.domain}${normPath}`
-      : `\n   -> Выбран транспорт: TCP Reality`
+      ? `\n   🛣️  Укажите путь (path) для XHTTP SelfSteal:\n👉 Путь XHTTP: ${config.domain}${normPath}\n   ✅ Выбран транспорт: XHTTP | Полный URL: ${config.domain}${normPath}`
+      : `\n   ✅ Выбран транспорт: TCP Reality`
   }
 
-4) На каком адресе:порту будет работать Target (SelfSteal)?
-Target [по умолчанию 127.0.0.1:9443]: ${fullTarget}
-   -> Target установлен: ${fullTarget}
+🎯 4) На каком адресе:порту будет работать Target (SelfSteal)?
+👉 Target [по умолчанию 127.0.0.1:9443]: ${fullTarget}
+   ✅ Target установлен: ${fullTarget}
 
-[1/7] Создание рабочей иерархии директорий в ${baseDir}... ОК
-[2/7] Установка зависимостей (dnsutils, socat, cron, openssl) и ${config.webServer}... ОК
+📂 [1/7] Создание рабочей иерархии директорий в ${baseDir}... ОК
+📦 [2/7] Установка зависимостей (dnsutils, socat, cron, openssl) и ${serverDisplayName}... ОК
 ${dnsCheckOutput}
-[4/7] Развертывание маскировочного HTML шаблона в ${baseDir}/html... ОК
-[5/7] Выпуск SSL сертификата Let's Encrypt и настройка Cron автообновления... ОК
-[6/7] Формирование конфигураций в ${baseDir}/conf/${confFile} и запуск... ОК
-[7/7] Установка CLI команды /usr/local/bin/selfssteal и подготовка Xray... ОК
+🎨 [4/7] Установка 6 HTML-шаблонов заглушек и рандомный выбор темы...
+   🎲 Выбрана заглушка: ${tpl.emoji} ${tpl.id} — ${tpl.description}
+   📂 Все 6 шаблонов сохранены в: ${baseDir}/html/templates/
+🔒 [5/7] Выпуск SSL сертификата Let's Encrypt и настройка Cron автообновления... ОК
+⚙️  [6/7] Формирование конфигураций в ${baseDir}/conf/${confFile} и запуск... ОК
+🛠️  [7/7] Создание глобального symlink /usr/local/bin/selfssteal -> ${baseDir}/selfssteal.sh... ОК
 
-========================================================================
-   УСТАНОВКА SELFSTEAL УСПЕШНО ЗАВЕРШЕНА! СВОДКА КОНФИГУРАЦИИ
-========================================================================
+🔗 ${serverDisplayName} for Reality SelfSteal
+Management System v2.5.0
+Project: VLESS ${config.transport.toUpperCase()} Reality | Author: t.me/wemkz
+──────────────────────────────────────────────────────────
 
-0. КОМАНДЫ УПРАВЛЕНИЯ (CLI УТИЛИТА SELFSSTEAL):
-   • selfssteal          — запустить сервис SelfSteal
-   • selfssteal status   — статус, сколько Uptime и директории SSL / HTML / конфигов
-   • selfssteal remove   — полностью удалить SelfSteal и очистить директории
-   • selfssteal logs     — просмотр логов запросов в реальном времени
+✅ Status: Running
+   Server:     ${serverDisplayName} (${baseDir})
+   Domain:     ${config.domain}
+   Transport:  VLESS ${config.transport.toUpperCase()} Reality
+   Port:       ${port} (Target: ${fullTarget})
+   SSL:        ✅ Valid, 89 days left (Let's Encrypt)
+   Template:   🎨 ${tpl.emoji} ${tpl.id} (${tpl.description})
 
-1. ДИРЕКТОРИИ УПРАВЛЕНИЯ (${baseDir}):
-   • Корневая папка:      ${baseDir}
-   • Конфиг веб-сервера:  ${baseDir}/conf/${confFile}
-   • Файлы сайта (HTML):  ${baseDir}/html/index.html
-   • SSL сертификаты:     ${baseDir}/ssl/fullchain.pem
-   • Приватный ключ SSL:  ${baseDir}/ssl/privkey.pem
-   • Автообновление SSL:  ${baseDir}/ssl/renew-hook.sh (Cron: ежедневно в 03:15)
-   • Логи запросов:       ${baseDir}/logs/access.log и ${baseDir}/logs/error.log
+📋 Команды управления (CLI утилита selfssteal):
+   ▶️  selfssteal start     — запустить сервис SelfSteal
+   📊 selfssteal status    — статус, сколько Uptime и директории SSL / HTML / конфигов
+   🎨 selfssteal template  — сменить HTML-заглушку (1-6 или Random)
+   📋 selfssteal menu      — открыть интерактивное меню управления
+   🗑️  selfssteal remove    — полностью удалить SelfSteal и очистить директории
 
-2. НЕОБХОДИМЫЕ ДОМЕННЫЕ ЗАПИСИ (DNS):
-   • Тип: A    | Имя: ${config.domain} | Значение: ${config.serverIp} | Proxy: DNS Only (БЕЗ Cloudflare Proxy)
-   • Тип: CAA  | Имя: @ | Значение: 0 issue "letsencrypt.org"
+📖 Что прописать в конфиг Xray (streamSettings):
+${generateXrayConfig(config)}
 
-3. ПАРАМЕТРЫ REALITY ДЛЯ ПАНЕЛИ (3X-UI / Marzban / Remnawave / Xray):
-   • Протокол / Сеть:     VLESS / ${config.transport.toUpperCase()} + Reality
-   • Target (Dest):       ${fullTarget}
-   • ServerNames (SNI):   ${config.domain}${
-    config.transport === 'xhttp'
-      ? `\n   • XHTTP Host:          ${config.domain}\n   • XHTTP Path:          ${normPath} (${config.domain}${normPath})`
-      : ''
-  }
-   • Private Key:         ${config.privateKey}
-   • Public Key (Клиент): ${config.publicKey}
-   • ShortId:             ${config.shortId}
-
-4. ЧТО ПРОПИСАТЬ В КОНФИГ XRAY (streamSettings):
-${generateXrayConfig(config)}`;
+💡 Tip: Use 'selfssteal template' to customize website templates`;
 }
 
 /**
@@ -1556,61 +1703,67 @@ export function generateGithubReadme(config: SelfStealConfig): string {
   const normPath = normalizeXhttpPath(config.xhttpPath, config.domain);
   const confFile = config.webServer === 'caddy' ? 'Caddyfile' : 'nginx.conf';
 
-  return `# SelfSteal Bash Architect — VLESS ${config.transport.toUpperCase()} Reality (${
+  return `# 🔗 SelfSteal Management System — VLESS ${config.transport.toUpperCase()} Reality (${
     config.webServer === 'caddy' ? 'Caddy' : 'Nginx'
   })
+
+**Author:** [t.me/wemkz](https://t.me/wemkz)
 
 ![OS](https://img.shields.io/badge/OS-Ubuntu%2020.04%2B%20%7C%20Debian%2011%2B-0ea5e9?style=flat-square)
 ![Transport](https://img.shields.io/badge/VLESS-${config.transport.toUpperCase()}%20Reality-10b981?style=flat-square)
 ![WebServer](https://img.shields.io/badge/Server-${
     config.webServer === 'caddy' ? 'Caddy' : 'Nginx'
   }-38bdf8?style=flat-square)
-![SSL](https://img.shields.io/badge/SSL-Let's%20Encrypt%20EC--256%20Auto--Renew-f59e0b?style=flat-square)
+![Author](https://img.shields.io/badge/Author-t.me%2Fwemkz-8b5cf6?style=flat-square)
 
-Автоматизированный Bash-скрипт **\`install-selfsteal.sh\`** для развертывания маскировочного узла **SelfSteal** под **VLESS + XHTTP / TCP + Reality** с поддержкой **Caddy** (\`/opt/ss-caddy\`) и **Nginx** (\`/opt/nginx\`), глобальной CLI-командой **\`selfssteal\`**, автоматической проверкой DNS через **\`1.1.1.1\` / \`8.8.8.8\` / \`9.9.9.9\`**, автообновлением сертификатов **Let's Encrypt** и ротацией логов запросов.
+Красивый цветной Bash-установщик **\`install-selfsteal.sh\`** с эмодзи-интерфейсом для развертывания маскировочного узла **SelfSteal** под **VLESS + XHTTP / TCP + Reality** с поддержкой **Caddy** (\`/opt/ss-caddy\`) и **Nginx** (\`/opt/nginx\`), **6 встроенными HTML-заглушками (с автоматическим случайным выбором)**, глобальной CLI-командой **\`selfssteal\`**, проверкой DNS через **\`1.1.1.1\` / \`8.8.8.8\` / \`9.9.9.9\`**, автообновлением сертификатов **Let's Encrypt** и ротацией логов.
 
 ---
 
-## Быстрая установка на VPS (одной командой из GitHub без скачивания)
+## 🚀 Быстрая установка на VPS (одной командой из GitHub без скачивания)
 
 Запустите установщик напрямую через \`bash <(curl ...)\` (интерактивный ввод работает через \`/dev/tty\`):
 
 \`\`\`bash
-sudo bash <(curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/selfsteal/main/install-selfsteal.sh)
+bash <(curl -fsSL "https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh")
 \`\`\`
 
-Или через пайп \`curl | sudo bash\`:
+Или через пайп \`curl | bash\`:
 
 \`\`\`bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/selfsteal/main/install-selfsteal.sh | sudo bash
+curl -fsSL "https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh" | bash
 \`\`\`
-
-### 4 шага интерактивного опроса + Автоматическая сверка DNS
-
-1. **Веб-сервер**: \`Caddy\` (\`/opt/ss-caddy\`) или \`Nginx\` (\`/opt/nginx\`) — выбран **${config.webServer.toUpperCase()}**.
-2. **Домен**: \`${config.domain}\` (используется для SNI и выпуска сертификата Let's Encrypt).
-3. **Транспорт**: \`XHTTP\` или \`TCP\` — выбран **${config.transport.toUpperCase()}**${
-    config.transport === 'xhttp'
-      ? ` с путем чанков \`${config.domain}${normPath}\` (\`${normPath}\`).`
-      : ' (`xtls-rprx-vision`).'
-  }
-4. **Target (Dest)**: локальный адрес и порт — **\`${fullTarget}\`** (по умолчанию \`127.0.0.1:9443\`).
-
-> **Автоматическая проверка DNS при установке**: перед выпуском сертификата скрипт определяет внешний IPv4 сервера и опрашивает публичные резолверы **\`1.1.1.1\`**, **\`8.8.8.8\`** и **\`9.9.9.9\`**. Если IP домена еще не обновился или не совпадает с IP сервера, скрипт выводит предупреждение и спрашивает подтверждение на продолжение установки.
 
 ---
 
-## Управление через CLI команду \`selfssteal\`
+## 🎨 6 встроенных HTML-заглушек (Рандомный выбор при установке)
 
-После установки в систему добавляется глобальная утилита \`/usr/local/bin/selfssteal\` (также доступен алиас \`selfsteal\`):
+Во время установки скрипт сохраняет все 6 реалистичных HTML-шаблонов в \`${baseDir}/html/templates/\` и **автоматически выбирает случайный шаблон (\`RANDOM % 6\`)** в \`${baseDir}/html/index.html\`. Вы также можете переключить шаблон в любой момент командой \`selfssteal template\`:
+
+| № | Файл шаблона | Описание маскировочной страницы |
+| :--- | :--- | :--- |
+| **1** | 🚀 \`1-speedtest.html\` | Спидтест с анимированным SVG-гейджем, пингом и цифрами скорости |
+| **2** | ☁️ \`2-cloud.html\` | Облачное хранилище файлов с сайдбаром, квотой диска и сеткой документов |
+| **3** | 😂 \`3-memes.html\` | Лента с мемами (**MemeDump**) в тёмной теме с карточками и лайками |
+| **4** | ⚠️ \`4-overloaded.html\` | Страница «Сервис временно перегружен» (\`HTTP 503\`) с живым прогресс-баром |
+| **5** | 💻 \`5-tech.html\` | Технический лендинг инфраструктурной компании (**Nexora Systems**) |
+| **6** | 🐙 \`6-gitpage.html\` | Страница репозитория в стиле GitHub (**GitPage** — \`wemk / core-infra\`) |
+
+---
+
+## 🛠️ Управление через CLI команду \`selfssteal\`
+
+При установке автоматически создается глобальный symlink **\`/usr/local/bin/selfssteal -> ${baseDir}/selfssteal.sh\`**:
 
 | Команда | Описание |
 | :--- | :--- |
-| \`selfssteal\` | Запустить сервис SelfSteal (${config.webServer}) и вывести краткую сводку |
-| \`selfssteal status\` | Показать статус работы, **точный Uptime**, срок действия SSL и пути к директориям **SSL / HTML / Конфигов** |
-| \`selfssteal remove\` | Полностью остановить и удалить SelfSteal, очистить Cron и директорию \`${baseDir}\` |
-| \`selfssteal restart\` | Перезапустить веб-сервер без разрыва соединений |
-| \`selfssteal logs\` | Открыть поток логов запросов (\`${baseDir}/logs/access.log\`) в реальном времени |
+| \`selfssteal start\` | ▶️ Запустить сервис SelfSteal (${config.webServer}) и показать статус |
+| \`selfssteal status\` | 📊 Показать статус процесса, **Uptime сервера и процесса**, срок SSL, активный HTML-шаблон и пути к **SSL / HTML** |
+| \`selfssteal template\` | 🎨 Выбрать один из 6 шаблонов заглушки (\`1-speedtest.html\` .. \`6-gitpage.html\`) или случайный |
+| \`selfssteal menu\` | 📋 Открыть интерактивное меню управления (опции 1–14) |
+| \`selfssteal remove\` | 🗑️ Полностью остановить и удалить SelfSteal, очистить Cron, директорию \`${baseDir}\` и symlink |
+| \`selfssteal restart\` | 🔄 Перезапустить веб-сервер без обрыва соединений |
+| \`selfssteal logs\` | 📝 Открыть поток логов запросов (\`${baseDir}/logs/access.log\`) в реальном времени |
 
 ### Пример вывода \`selfssteal status\`:
 
@@ -1620,34 +1773,23 @@ ${generateCliCommandPreview(config, 'status')}
 
 ---
 
-## Архитектура и схема работы
+## 📂 Структура директории \`${baseDir}\`
 
 \`\`\`text
-Входящее подключение (443/tcp) ──► Xray Core (VLESS + Reality)
-                                      │
-          ┌───────────────────────────┴───────────────────────────┐
-          ▼ Авторизованный клиент                                 ▼ Чужой запрос / Active Probing
-   Туннель VLESS ${config.transport.toUpperCase()}                              Target (Dest): ${fullTarget}
-   ${
-     config.transport === 'xhttp'
-       ? `Path: ${normPath}`
-       : 'Flow: xtls-rprx-vision'
-   }                             ${config.webServer.toUpperCase()} в директории ${baseDir}
-                                                           • Сертификат Let's Encrypt (${baseDir}/ssl)
-                                                           • Маскировочный HTML (${baseDir}/html)
-                                                           • Журнал запросов (${baseDir}/logs)
-\`\`\`
-
----
-
-## Структура директории \`${baseDir}\`
-
-\`\`\`text
+/usr/local/bin/selfssteal ─────────► symlink на ${baseDir}/selfssteal.sh
 ${baseDir}/
+├── selfssteal.sh                   # Цветная CLI утилита управления (Author: t.me/wemkz)
 ├── conf/
 │   └── ${confFile}                  # Конфигурация ${config.webServer === 'caddy' ? 'Caddy' : 'Nginx'} (слушает ${fullTarget})
 ├── html/
-│   └── index.html                  # Статика маскировочного сайта SelfSteal
+│   ├── index.html                  # Активная HTML-заглушка (выбранная случайно из 6)
+│   └── templates/
+│       ├── 1-speedtest.html        # 🚀 Спидтест с анимированным гейджем
+│       ├── 2-cloud.html            # ☁️ Облачное хранилище
+│       ├── 3-memes.html            # 😂 Лента с мемами
+│       ├── 4-overloaded.html       # ⚠️ Сервис перегружен (503)
+│       ├── 5-tech.html             # 💻 Технический лендинг (Nexora Systems)
+│       └── 6-gitpage.html          # 🐙 Репозиторий GitPage (wemk / core-infra)
 ├── ssl/
 │   ├── fullchain.pem               # Сертификат Let's Encrypt (ECC P-256)
 │   ├── privkey.pem                 # Приватный ключ TLS (chmod 600)
@@ -1659,7 +1801,7 @@ ${baseDir}/
 
 ---
 
-## Доменные записи (DNS) для \`${config.domain}\`
+## 🌐 Доменные записи (DNS) для \`${config.domain}\`
 
 | Тип | Имя | Значение | TTL | Режим проксирования |
 | :--- | :--- | :--- | :--- | :--- |
@@ -1668,7 +1810,7 @@ ${baseDir}/
 
 ---
 
-## Настройки для Xray / 3X-UI / Marzban
+## 📖 Что прописать в конфиг Xray (\`streamSettings\`)
 
 - **Target (Dest)**: \`${fullTarget}\`
 - **ServerNames (SNI)**: \`${config.domain}\`${

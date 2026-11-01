@@ -3,6 +3,8 @@ import { RefreshCw } from 'lucide-react';
 import {
   type SelfStealConfig,
   type ValidationResult,
+  type StubTemplateId,
+  STUB_TEMPLATES,
   parseDomainAndPathInput,
   normalizeXhttpPath,
   normalizeTargetAddress,
@@ -214,10 +216,45 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({
         )}
       </div>
 
-      {/* ШАГ 5: Let's Encrypt и Логирование */}
+      {/* ШАГ 5: Шаблон HTML-заглушки (Random из 6 или конкретный) */}
+      <div className="pt-4 border-t border-slate-800 space-y-2">
+        <div className="flex items-center justify-between text-xs">
+          <label htmlFor="stub-template-select" className="font-semibold text-slate-200">
+            05. Маскировочная HTML-заглушка (6 шаблонов)
+          </label>
+          <span className="font-mono text-sky-400">
+            {config.camouflageTheme === 'random' ? '🎲 Random (1–6)' : config.camouflageTheme}
+          </span>
+        </div>
+        <select
+          id="stub-template-select"
+          value={config.camouflageTheme}
+          onChange={(e) =>
+            onChange((prev) => ({
+              ...prev,
+              camouflageTheme: e.target.value as StubTemplateId,
+            }))
+          }
+          className="w-full px-3 py-2 text-xs font-mono bg-slate-950 border border-slate-800 rounded-md text-slate-100 focus:border-sky-400 focus:outline-none"
+        >
+          <option value="random">
+            🎲 Рандомный выбор при установке (RANDOM % 6 из всех шаблонов)
+          </option>
+          {STUB_TEMPLATES.map((tpl) => (
+            <option key={tpl.id} value={tpl.id}>
+              {tpl.emoji} {tpl.id} — {tpl.description}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-slate-400">
+          Все 6 шаблонов сохраняются в <span className="font-mono text-slate-300">{baseDir}/html/templates/</span>, смена в 1 клик через <span className="font-mono text-sky-400">selfssteal template</span>
+        </p>
+      </div>
+
+      {/* ШАГ 6: Let's Encrypt и Логирование */}
       <div className="pt-4 border-t border-slate-800 space-y-4">
         <h3 className="text-xs font-semibold text-slate-200">
-          05. Сертификаты Let&apos;s Encrypt и логирование
+          06. Сертификаты Let&apos;s Encrypt и логирование
         </h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

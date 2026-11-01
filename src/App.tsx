@@ -44,7 +44,7 @@ const DEFAULT_CONFIG: SelfStealConfig = {
   enableErrorLog: true,
   logFormat: 'json',
   logRetentionDays: 14,
-  camouflageTheme: 'cdn-edge',
+  camouflageTheme: 'random',
   uuid: '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
   privateKey: 'cO7rV8pW9zL1mK3nJ5bH7vG9fC2dX4sA6qW8eR0tY2u',
   publicKey: 'pU8bL2kM4nJ6vH8xG0cF3dZ5sA7qW9eR1tY3uI5oP7a',
@@ -54,7 +54,9 @@ const DEFAULT_CONFIG: SelfStealConfig = {
 export default function App() {
   const [config, setConfig] = useState<SelfStealConfig>(DEFAULT_CONFIG);
   const [activeTab, setActiveTab] = useState<ActiveTab>('bash');
-  const [githubRepo, setGithubRepo] = useState('YOUR_USERNAME/selfsteal');
+  const [githubRepo, setGithubRepo] = useState(
+    'https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh'
+  );
   const [oneLinerCopied, setOneLinerCopied] = useState<'process' | 'pipe' | null>(null);
 
   const validation = useMemo(() => validateConfig(config), [config]);
@@ -94,10 +96,15 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  const cleanRepo = githubRepo.trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '') || 'YOUR_USERNAME/selfsteal';
-  const rawScriptUrl = `https://raw.githubusercontent.com/${cleanRepo}/main/install-selfsteal.sh`;
-  const bashProcessOneLiner = `sudo bash <(curl -fsSL ${rawScriptUrl})`;
-  const bashPipeOneLiner = `curl -fsSL ${rawScriptUrl} | sudo bash`;
+  const trimmedRepoInput = githubRepo.trim();
+  const rawScriptUrl = trimmedRepoInput.startsWith('http://') || trimmedRepoInput.startsWith('https://')
+    ? trimmedRepoInput
+    : `https://raw.githubusercontent.com/${
+        trimmedRepoInput.replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '') ||
+        'wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality'
+      }/refs/heads/main/install-selfsteal.sh`;
+  const bashProcessOneLiner = `bash <(curl -fsSL "${rawScriptUrl}")`;
+  const bashPipeOneLiner = `curl -fsSL "${rawScriptUrl}" | bash`;
 
   const handleCopyOneLiner = async (type: 'process' | 'pipe') => {
     const text = type === 'process' ? bashProcessOneLiner : bashPipeOneLiner;
@@ -225,7 +232,9 @@ export default function App() {
             <div className="text-xs text-slate-400 font-mono">
               <span>VLESS XHTTP / TCP Reality</span>
               <span aria-hidden="true"> · </span>
-              <span>Let&apos;s Encrypt EC-256 Auto-Renew</span>
+              <span>Author: t.me/wemkz</span>
+              <span aria-hidden="true"> · </span>
+              <span>🎲 6 HTML-заглушек (Random)</span>
               <span aria-hidden="true"> · </span>
               <span>{baseDir}</span>
             </div>
@@ -397,20 +406,20 @@ export default function App() {
                         Запуск одной командой через Bash (из GitHub Raw без скачивания)
                       </div>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        Все вопросы скрипта читают ввод через <span className="font-mono text-slate-300">/dev/tty</span>, поэтому интерактивный диалог работает напрямую через <span className="font-mono text-slate-300">bash &lt;(curl ...)</span> и <span className="font-mono text-slate-300">curl | sudo bash</span>.
+                        Все вопросы скрипта читают ввод через <span className="font-mono text-slate-300">/dev/tty</span>, поэтому интерактивный диалог работает напрямую через <span className="font-mono text-slate-300">bash &lt;(curl ...)</span> и <span className="font-mono text-slate-300">curl | bash</span>.
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
                       <label htmlFor="github-repo-input" className="text-xs text-slate-400 whitespace-nowrap">
-                        Ваш GitHub (user/repo):
+                        GitHub Raw URL:
                       </label>
                       <input
                         id="github-repo-input"
                         type="text"
                         value={githubRepo}
                         onChange={(e) => setGithubRepo(e.target.value)}
-                        placeholder="YOUR_USERNAME/selfsteal"
-                        className="px-2.5 py-1 text-xs font-mono bg-slate-950 border border-slate-800 focus:border-sky-400 focus:outline-none rounded text-slate-100 w-52"
+                        placeholder="https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh"
+                        className="px-2.5 py-1 text-xs font-mono bg-slate-950 border border-slate-800 focus:border-sky-400 focus:outline-none rounded text-slate-100 w-full sm:w-80"
                       />
                     </div>
                   </div>
@@ -437,10 +446,10 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Вариант 2: curl -fsSL ... | sudo bash */}
+                  {/* Вариант 2: curl -fsSL ... | bash */}
                   <div className="space-y-1">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-400">Вариант 2 (классический пайп curl | sudo bash):</span>
+                      <span className="text-slate-400">Вариант 2 (классический пайп curl | bash):</span>
                       <button
                         type="button"
                         onClick={() => handleCopyOneLiner('pipe')}

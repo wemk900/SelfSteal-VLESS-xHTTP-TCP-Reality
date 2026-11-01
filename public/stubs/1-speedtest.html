@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Speedtest — проверка скорости интернета</title>
+<style>
+:root{--bg:#f4f6fa;--card:#fff;--text:#1a1f2b;--muted:#6b7380;--accent:#2563eb;--track:#e5e9f0}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.card{background:var(--card);border-radius:20px;box-shadow:0 10px 40px rgba(20,30,60,.08);padding:40px 32px;max-width:420px;width:100%;text-align:center}
+.logo{font-weight:800;font-size:20px;letter-spacing:-.02em;margin-bottom:28px;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--accent)}
+.logo svg{width:22px;height:22px}
+.gauge{position:relative;width:240px;height:240px;margin:0 auto 20px}
+.gauge svg{width:100%;height:100%;transform:rotate(-90deg)}
+.gauge circle{fill:none;stroke-width:14;stroke-linecap:round}
+.gauge .track{stroke:var(--track)}
+.gauge .fill{stroke:var(--accent);stroke-dasharray:565;stroke-dashoffset:565;animation:fill 1.8s ease-out forwards}
+@keyframes fill{to{stroke-dashoffset:140}}
+.value{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.num{font-size:44px;font-weight:800;letter-spacing:-.02em}
+.unit{font-size:13px;color:var(--muted);margin-top:2px}
+.stats{display:flex;justify-content:center;gap:28px;margin:22px 0 8px}
+.stat{text-align:center}
+.stat .n{font-size:18px;font-weight:700}
+.stat .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+.btn{margin-top:20px;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:14px 32px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn:hover{opacity:.9}
+.meta{margin-top:18px;font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Speedtest</div>
+  <div class="gauge">
+    <svg viewBox="0 0 200 200">
+      <circle class="track" cx="100" cy="100" r="90"/>
+      <circle class="fill" cx="100" cy="100" r="90"/>
+    </svg>
+    <div class="value"><div class="num">187</div><div class="unit">Мбит/с</div></div>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="n">12 мс</div><div class="l">Пинг</div></div>
+    <div class="stat"><div class="n">187</div><div class="l">Загрузка</div></div>
+    <div class="stat"><div class="n">94</div><div class="l">Отдача</div></div>
+  </div>
+  <button class="btn">Начать заново</button>
+  <div class="meta">Ваш IP: 185.23.xx.xx · Сервер: Москва</div>
+</div>
+</body>
+</html>

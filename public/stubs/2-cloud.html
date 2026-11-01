@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cloud — ваше хранилище</title>
+<style>
+:root{--bg:#f7f8fa;--sidebar:#fff;--text:#20242c;--muted:#8a909c;--accent:#4f7cff;--border:#eceef2}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex}
+.sidebar{width:220px;background:var(--sidebar);border-right:1px solid var(--border);padding:24px 16px;flex-shrink:0}
+.logo{font-weight:800;font-size:18px;margin-bottom:28px;display:flex;align-items:center;gap:8px;color:var(--accent)}
+.logo svg{width:22px;height:22px}
+.nav a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;color:var(--muted);text-decoration:none;font-size:14px;margin-bottom:2px}
+.nav a.active{background:#eef2ff;color:var(--accent);font-weight:600}
+.nav svg{width:17px;height:17px;flex-shrink:0}
+.storage{margin-top:24px;padding:14px;background:#f2f4f8;border-radius:12px}
+.storage .bar{height:6px;background:var(--border);border-radius:4px;overflow:hidden;margin:8px 0}
+.storage .bar i{display:block;width:38%;height:100%;background:var(--accent)}
+.storage p{font-size:12px;color:var(--muted)}
+.main{flex:1;padding:28px 36px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+.top h1{font-size:22px;font-weight:700}
+.upload{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;cursor:pointer}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px}
+.file{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center}
+.file .icon{width:44px;height:44px;margin:0 auto 10px;border-radius:10px;display:flex;align-items:center;justify-content:center}
+.file .icon svg{width:22px;height:22px;color:#fff}
+.file p{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file span{font-size:11px;color:var(--muted)}
+@media(max-width:600px){.sidebar{display:none}.main{padding:20px}}
+</style>
+</head>
+<body>
+<aside class="sidebar">
+  <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 18a4 4 0 0 1-1-7.9A5 5 0 0 1 16 8a4.5 4.5 0 0 1 1 8.9"/></svg>Cloud</div>
+  <nav class="nav">
+    <a class="active" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>Мои файлы</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2 3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg>Избранное</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.7 1 6.3 2.7"/><path d="M21 3v6h-6"/></svg>Последние</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>Корзина</a>
+  </nav>
+  <div class="storage"><p>38% занято</p><div class="bar"><i></i></div><p>5.7 ГБ из 15 ГБ</p></div>
+</aside>
+<main class="main">
+  <div class="top"><h1>Мои файлы</h1><button class="upload">+ Загрузить</button></div>
+  <div class="grid">
+    <div class="file"><div class="icon" style="background:#60a5fa"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></div><p>Отчёт.pdf</p><span>2.1 МБ</span></div>
+    <div class="file"><div class="icon" style="background:#34d399"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg></div><p>Фото.jpg</p><span>4.8 МБ</span></div>
+    <div class="file"><div class="icon" style="background:#f472b6"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></div><p>Презентация.pptx</p><span>11 МБ</span></div>
+    <div class="file"><div class="icon" style="background:#fbbf24"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div><p>Проект</p><span>папка</span></div>
+  </div>
+</main>
+</body>
+</html>
