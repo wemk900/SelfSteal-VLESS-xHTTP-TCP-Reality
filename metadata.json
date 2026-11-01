@@ -1,0 +1,6 @@
+{
+  "name": "SelfSteal Bash Architect — VLESS XHTTP/TCP Reality",
+  "description": "Генератор Bash-скрипта установки SelfSteal (Caddy/Nginx) для VLESS XHTTP/TCP Reality с поддержкой Let's Encrypt, логирования и готовыми конфигурациями Xray.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
