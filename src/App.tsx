@@ -463,36 +463,12 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* VLESS Клиентская ссылка */}
-                <div className="border border-slate-800 rounded-lg bg-slate-900/60 p-4 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-slate-200">
-                      Клиентская ссылка VLESS ({config.transport.toUpperCase()} Reality)
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleCopyUri}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-md transition-colors cursor-pointer"
-                    >
-                      {uriCopied ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5 text-slate-400" />
-                      )}
-                      <span>{uriCopied ? 'Скопировано' : 'Копировать VLESS URI'}</span>
-                    </button>
-                  </div>
-                  <div className="p-2.5 rounded bg-slate-950 border border-slate-800 font-mono text-xs text-slate-300 break-all select-all">
-                    {vlessUri}
-                  </div>
-                </div>
-
-                {/* Полный JSON для Xray */}
+                {/* Блок streamSettings для Xray */}
                 <CodeBlock
-                  title="Конфигурация Xray (/usr/local/etc/xray/config.json)"
-                  subtitle={`Inbound VLESS + ${config.transport.toUpperCase()} + Reality -> dest ${fullTarget}`}
+                  title="Что прописать в конфиг Xray (блок streamSettings)"
+                  subtitle={`streamSettings: network "${config.transport}" + security "reality" -> dest ${fullTarget}`}
                   code={xrayConfig}
-                  filename="xray-config.json"
+                  filename="xray-streamSettings.json"
                 />
               </div>
             )}

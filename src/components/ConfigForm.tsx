@@ -337,8 +337,8 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({
             <span className="text-slate-200 truncate">{config.shortId}</span>
           </div>
           <div className="flex justify-between gap-2">
-            <span className="text-slate-500">UUID:</span>
-            <span className="text-slate-200 truncate">{config.uuid}</span>
+            <span className="text-slate-500">PrivateKey:</span>
+            <span className="text-slate-200 truncate">{config.privateKey}</span>
           </div>
         </div>
       </div>

@@ -159,31 +159,31 @@ export const DirectoryExplorer: React.FC<DirectoryExplorerProps> = ({ config }) 
         </div>
       </section>
 
-      {/* Памятка по управлению сервисом и логами */}
+      {/* Памятка по управлению сервисом через CLI selfssteal */}
       <section className="border border-slate-800 rounded-lg bg-slate-900/60 p-5 space-y-3">
         <div className="flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
           <h4 className="text-sm font-semibold text-slate-100">
-            Быстрые команды обслуживания {baseDir}
+            Управление через глобальную команду <span className="font-mono text-sky-400">selfssteal</span> ({baseDir})
           </h4>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
           <div className="p-3 rounded-md bg-slate-950 border border-slate-800 space-y-1">
-            <div className="text-slate-400">Проверка логов в реальном времени</div>
-            <div className="font-mono text-slate-200 select-all">
-              tail -f {baseDir}/logs/access.log
+            <div className="text-slate-400">Запустить SelfSteal</div>
+            <div className="font-mono text-emerald-400 select-all">
+              selfssteal
             </div>
           </div>
           <div className="p-3 rounded-md bg-slate-950 border border-slate-800 space-y-1">
-            <div className="text-slate-400">Принудительное обновление SSL Let&apos;s Encrypt</div>
-            <div className="font-mono text-slate-200 select-all">
-              bash {baseDir}/ssl/renew-hook.sh
+            <div className="text-slate-400">Статус, Uptime и директории SSL / HTML</div>
+            <div className="font-mono text-sky-400 select-all">
+              selfssteal status
             </div>
           </div>
           <div className="p-3 rounded-md bg-slate-950 border border-slate-800 space-y-1">
-            <div className="text-slate-400">Перезапуск после правок конфига</div>
-            <div className="font-mono text-slate-200 select-all">
-              systemctl reload {config.webServer}
+            <div className="text-slate-400">Полное удаление SelfSteal и директорий</div>
+            <div className="font-mono text-rose-400 select-all">
+              selfssteal remove
             </div>
           </div>
         </div>

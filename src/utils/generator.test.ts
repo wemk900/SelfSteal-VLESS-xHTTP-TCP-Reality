@@ -9,6 +9,8 @@ import {
   generateWebServerConfig,
   generateXrayConfig,
   generateBashInstallScript,
+  generateSelfstealCliScript,
+  generateCliCommandPreview,
   generateGithubReadme,
   getDirectoryStructure,
   type SelfStealConfig,
@@ -82,18 +84,25 @@ test('validateConfig validates domain, xhttpPath, and target properly', () => {
   assert.equal(validateConfig({ ...sampleConfig, target: 'invalid-target' }).valid, false);
 });
 
-test('generateXrayConfig produces valid JSON with XHTTP or TCP Reality settings', () => {
-  const xhttpJson = JSON.parse(generateXrayConfig(sampleConfig));
-  assert.equal(xhttpJson.inbounds[0].streamSettings.network, 'xhttp');
-  assert.equal(xhttpJson.inbounds[0].streamSettings.realitySettings.dest, '127.0.0.1:9443');
-  assert.equal(xhttpJson.inbounds[0].streamSettings.xhttpSettings.path, '/media/v3/chunk/');
+test('generateXrayConfig produces valid streamSettings JSON without UUID for XHTTP or TCP Reality', () => {
+  const xhttpRaw = generateXrayConfig(sampleConfig);
+  const xhttpJson = JSON.parse(xhttpRaw);
+  assert.equal(xhttpJson.streamSettings.network, 'xhttp');
+  assert.equal(xhttpJson.streamSettings.security, 'reality');
+  assert.equal(xhttpJson.streamSettings.realitySettings.dest, '127.0.0.1:9443');
+  assert.equal(xhttpJson.streamSettings.realitySettings.target, '127.0.0.1:9443');
+  assert.equal(xhttpJson.streamSettings.xhttpSettings.path, '/media/v3/chunk/');
+  assert.equal(xhttpJson.streamSettings.xhttpSettings.host, 'poland.example.xyz');
+  assert.equal(xhttpJson.streamSettings.xhttpSettings.mode, 'auto');
+  assert.equal(xhttpRaw.includes('clients'), false);
+  assert.equal(xhttpRaw.includes(sampleConfig.uuid), false);
 
   const tcpJson = JSON.parse(generateXrayConfig({ ...sampleConfig, transport: 'tcp' }));
-  assert.equal(tcpJson.inbounds[0].streamSettings.network, 'tcp');
-  assert.equal(tcpJson.inbounds[0].settings.clients[0].flow, 'xtls-rprx-vision');
+  assert.equal(tcpJson.streamSettings.network, 'tcp');
+  assert.equal(tcpJson.streamSettings.realitySettings.dest, '127.0.0.1:9443');
 });
 
-test('generateWebServerConfig and getDirectoryStructure include SSL, HTML, logs, and config paths', () => {
+test('generateWebServerConfig and getDirectoryStructure include SSL, HTML, logs, CLI and config paths', () => {
   const caddyConf = generateWebServerConfig(sampleConfig);
   assert.ok(caddyConf.includes('/opt/ss-caddy/ssl/fullchain.pem'));
   assert.ok(caddyConf.includes('/opt/ss-caddy/logs/access.log'));
@@ -104,27 +113,43 @@ test('generateWebServerConfig and getDirectoryStructure include SSL, HTML, logs,
   assert.ok(nginxConf.includes('listen 127.0.0.1:9443 ssl http2;'));
 
   const files = getDirectoryStructure(sampleConfig);
+  assert.ok(files.some((f) => f.path === '/usr/local/bin/selfssteal'));
   assert.ok(files.some((f) => f.path === '/opt/ss-caddy/conf/Caddyfile'));
   assert.ok(files.some((f) => f.path === '/opt/ss-caddy/ssl/fullchain.pem'));
   assert.ok(files.some((f) => f.path === '/opt/ss-caddy/html/index.html'));
   assert.ok(files.some((f) => f.path === '/opt/ss-caddy/logs/access.log'));
 });
 
-test('generateBashInstallScript includes all 4 sequential prompts and post-install summary', () => {
+test('generateBashInstallScript includes 4 sequential prompts, DNS 1.1.1.1/8.8.8.8/9.9.9.9 check, and selfssteal CLI', () => {
   const script = generateBashInstallScript(sampleConfig);
   assert.ok(script.includes('1) Выберите веб-сервер для SelfSteal:'));
   assert.ok(script.includes('2) Укажите ваш домен для SelfSteal'));
   assert.ok(script.includes('3) Выберите тип транспорта для VLESS Reality:'));
   assert.ok(script.includes('4) На каком адресе:порту будет работать Target'));
-  assert.ok(script.includes('/opt/ss-caddy'));
-  assert.ok(script.includes('/opt/nginx'));
+  assert.ok(script.includes('for RESOLVER in "1.1.1.1" "8.8.8.8" "9.9.9.9"; do'));
+  assert.ok(script.includes('Продолжить установку несмотря на несовпадение DNS? [y/N]:'));
+  assert.ok(script.includes('/usr/local/bin/selfssteal'));
 });
 
-test('generateGithubReadme includes 4 steps, directory tree, DNS table, and Xray config', () => {
+test('generateSelfstealCliScript and generateCliCommandPreview support start, status (with Uptime & SSL/HTML dirs), and remove', () => {
+  const cliScript = generateSelfstealCliScript(sampleConfig);
+  assert.ok(cliScript.includes('cmd_start()'));
+  assert.ok(cliScript.includes('cmd_status()'));
+  assert.ok(cliScript.includes('cmd_remove()'));
+  assert.ok(cliScript.includes('get_service_uptime()'));
+
+  const statusPreview = generateCliCommandPreview(sampleConfig, 'status');
+  assert.ok(statusPreview.includes('selfssteal status'));
+  assert.ok(statusPreview.includes('Время работы (Uptime):'));
+  assert.ok(statusPreview.includes('/opt/ss-caddy/ssl'));
+  assert.ok(statusPreview.includes('/opt/ss-caddy/html'));
+});
+
+test('generateGithubReadme includes 4 steps, directory tree, DNS check, and selfssteal CLI', () => {
   const readme = generateGithubReadme(sampleConfig);
   assert.ok(readme.includes('install-selfsteal.sh'));
-  assert.ok(readme.includes('/opt/ss-caddy'));
-  assert.ok(readme.includes('poland.example.xyz/media/v3/chunk/'));
-  assert.ok(readme.includes('127.0.0.1:9443'));
+  assert.ok(readme.includes('selfssteal status'));
+  assert.ok(readme.includes('1.1.1.1'));
+  assert.ok(readme.includes('8.8.8.8'));
+  assert.ok(readme.includes('9.9.9.9'));
 });
-

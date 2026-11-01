@@ -3,7 +3,9 @@
 # SelfSteal Installer for VLESS XHTTP / TCP Reality (Caddy / Nginx)
 # Поддержка: Ubuntu 20.04/22.04/24.04, Debian 11/12
 # Автообновление Let's Encrypt (acme.sh / certbot) + Логирование запросов
+# Автоматическая проверка DNS через 1.1.1.1, 8.8.8.8, 9.9.9.9
 # Директории управления: /opt/ss-caddy или /opt/nginx
+# CLI команда управления: selfssteal (start | status | remove | restart | logs)
 # ==============================================================================
 
 set -euo pipefail
@@ -133,10 +135,10 @@ ACME_EMAIL="${ACME_EMAIL:-admin@${DOMAIN}}"
 
 mkdir -p "${BASE_DIR}/conf" "${BASE_DIR}/html" "${BASE_DIR}/ssl" "${BASE_DIR}/logs"
 
-echo -e "${CYAN}[1/5] Установка пакетов и ${WEB_SERVER}...${NC}"
+echo -e "${CYAN}[1/6] Установка пакетов (dnsutils, socat, cron, openssl) и ${WEB_SERVER}...${NC}"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y -qq
-apt-get install -y -qq curl socat cron openssl logrotate ca-certificates
+apt-get install -y -qq curl socat cron openssl logrotate dnsutils ca-certificates
 
 if [[ "${WEB_SERVER}" == "caddy" ]]; then
   if ! command -v caddy >/dev/null 2>&1; then
@@ -151,7 +153,47 @@ else
   fi
 fi
 
-echo -e "${CYAN}[2/5] Создание маскировочного сайта в ${BASE_DIR}/html/index.html...${NC}"
+# ------------------------------------------------------------------------------
+# Автоматическая проверка DNS A-записи через 1.1.1.1, 8.8.8.8 и 9.9.9.9
+# ------------------------------------------------------------------------------
+echo -e "${CYAN}[2/6] Проверка DNS A-записи домена ${DOMAIN} через 1.1.1.1, 8.8.8.8 и 9.9.9.9...${NC}"
+SERVER_IPV4=$(curl -4 -fsSL --max-time 5 https://icanhazip.com 2>/dev/null || curl -4 -fsSL --max-time 5 https://ifconfig.me 2>/dev/null || echo "YOUR_SERVER_IP")
+SERVER_IPV4="${SERVER_IPV4//[[:space:]]/}"
+echo -e "   • Внешний IPv4 этого сервера: ${BOLD}${SERVER_IPV4}${NC}"
+
+DNS_MISMATCH=0
+for RESOLVER in "1.1.1.1" "8.8.8.8" "9.9.9.9"; do
+  RESOLVED_IP=""
+  if command -v dig >/dev/null 2>&1; then
+    RESOLVED_IP=$(dig +short +time=2 +tries=1 @"${RESOLVER}" "${DOMAIN}" A 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 || true)
+  elif command -v nslookup >/dev/null 2>&1; then
+    RESOLVED_IP=$(nslookup "${DOMAIN}" "${RESOLVER}" 2>/dev/null | awk '/^Address: / { print $2 }' | tail -n1 || true)
+  fi
+
+  if [[ -z "${RESOLVED_IP}" ]]; then
+    echo -e "   • DNS ${RESOLVER}: ${RED}✗ НЕ НАЙДЕНА A-ЗАПИСЬ (NXDOMAIN / Timeout)${NC} (ожидался ${SERVER_IPV4})"
+    DNS_MISMATCH=1
+  elif [[ "${RESOLVED_IP}" == "${SERVER_IPV4}" ]]; then
+    echo -e "   • DNS ${RESOLVER}: ${GREEN}✓ ${RESOLVED_IP} (СОВПАДАЕТ)${NC}"
+  else
+    echo -e "   • DNS ${RESOLVER}: ${YELLOW}✗ ${RESOLVED_IP} (НЕ СОВПАДАЕТ, ожидался ${SERVER_IPV4})${NC}"
+    DNS_MISMATCH=1
+  fi
+done
+
+if [[ "${DNS_MISMATCH}" -ne 0 ]]; then
+  echo ""
+  echo -e "${YELLOW}[ВНИМАНИЕ] IP домена ${DOMAIN} у одного или нескольких DNS (1.1.1.1 / 8.8.8.8 / 9.9.9.9) не совпадает с IP сервера (${SERVER_IPV4}).${NC}"
+  read -r -p "Продолжить установку несмотря на несовпадение DNS? [y/N]: " DNS_CONTINUE_CHOICE
+  DNS_CONTINUE_CHOICE="${DNS_CONTINUE_CHOICE:-N}"
+  if [[ "${DNS_CONTINUE_CHOICE,,}" != "y" ]]; then
+    echo -e "${RED}Установка прервана пользователем.${NC}"
+    exit 1
+  fi
+  echo -e "   ${YELLOW}-> Продолжаем установку по подтверждению пользователя...${NC}"
+fi
+
+echo -e "${CYAN}[3/6] Создание маскировочного сайта в ${BASE_DIR}/html/index.html...${NC}"
 cat > "${BASE_DIR}/html/index.html" <<EOF
 <!DOCTYPE html>
 <html lang="en">
@@ -162,7 +204,7 @@ cat > "${BASE_DIR}/html/index.html" <<EOF
 </html>
 EOF
 
-echo -e "${CYAN}[3/5] Выпуск сертификата Let's Encrypt и настройка автообновления в ${BASE_DIR}/ssl...${NC}"
+echo -e "${CYAN}[4/6] Выпуск сертификата Let's Encrypt и настройка автообновления в ${BASE_DIR}/ssl...${NC}"
 if [[ ! -f ~/.acme.sh/acme.sh ]]; then
   curl -fsSL https://get.acme.sh | sh -s email="${ACME_EMAIL}"
 fi
@@ -194,7 +236,7 @@ EOF
 chmod +x "${BASE_DIR}/ssl/renew-hook.sh"
 (crontab -l 2>/dev/null | grep -v "renew-hook.sh" || true; echo "15 3 * * * ${BASE_DIR}/ssl/renew-hook.sh >/dev/null 2>&1") | crontab -
 
-echo -e "${CYAN}[4/5] Запись конфигурации веб-сервера и логирования запросов в ${BASE_DIR}...${NC}"
+echo -e "${CYAN}[5/6] Запись конфигурации веб-сервера и логирования запросов в ${BASE_DIR}...${NC}"
 if [[ "${WEB_SERVER}" == "caddy" ]]; then
   cat > "${BASE_DIR}/conf/Caddyfile" <<EOF
 {
@@ -258,17 +300,135 @@ EOF
   nginx -t && systemctl enable nginx && systemctl restart nginx
 fi
 
-SERVER_IPV4=$(curl -4 -fsSL https://icanhazip.com 2>/dev/null || echo "YOUR_SERVER_IP")
-UUID=$(cat /proc/sys/kernel/random/uuid 2>/dev/null || echo "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d")
+echo -e "${CYAN}[6/6] Установка CLI команды /usr/local/bin/selfssteal...${NC}"
+cat > /usr/local/bin/selfssteal <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+WEB_SERVER="${WEB_SERVER}"
+BASE_DIR="${BASE_DIR}"
+DOMAIN="${DOMAIN}"
+TRANSPORT="${TRANSPORT}"
+XHTTP_PATH="${XHTTP_PATH}"
+TARGET="${TARGET}"
+SSL_DIR="\${BASE_DIR}/ssl"
+HTML_DIR="\${BASE_DIR}/html"
+CONF_DIR="\${BASE_DIR}/conf"
+LOGS_DIR="\${BASE_DIR}/logs"
+
+get_uptime() {
+  local pid
+  pid=\$(systemctl show -p MainPID --value "\${WEB_SERVER}" 2>/dev/null || echo "0")
+  if [[ -n "\${pid}" && "\${pid}" != "0" ]] && ps -p "\${pid}" >/dev/null 2>&1; then
+    ps -o etime= -p "\${pid}" 2>/dev/null | xargs || echo "active"
+  else
+    echo "stopped (0s)"
+  fi
+}
+
+case "\${1:-start}" in
+  start|"")
+    systemctl start "\${WEB_SERVER}"
+    echo "SelfSteal (\${WEB_SERVER}) запущен на \${TARGET} | Uptime: \$(get_uptime)"
+    echo "Директория SSL: \${SSL_DIR} | Директория HTML: \${HTML_DIR}"
+    ;;
+  status)
+    echo "========================================================================"
+    echo "   СТАТУС SELFSTEAL (\${WEB_SERVER^^} · \${DOMAIN} · \${TARGET})"
+    echo "========================================================================"
+    echo " • Статус сервиса:  \$(systemctl is-active "\${WEB_SERVER}" 2>/dev/null || echo "inactive")"
+    echo " • Время Uptime:    \$(get_uptime)"
+    echo " • Директория SSL:  \${SSL_DIR} (fullchain.pem, privkey.pem)"
+    echo " • Директория HTML: \${HTML_DIR} (index.html)"
+    echo " • Конфигурации:    \${CONF_DIR}"
+    echo " • Логи запросов:   \${LOGS_DIR}"
+    echo "========================================================================"
+    ;;
+  remove)
+    read -r -p "Удалить SelfSteal и директорию \${BASE_DIR}? [y/N]: " CONFIRM
+    if [[ "\${CONFIRM,,}" == "y" ]]; then
+      systemctl stop "\${WEB_SERVER}" >/dev/null 2>&1 || true
+      (crontab -l 2>/dev/null | grep -v "renew-hook.sh" || true) | crontab -
+      rm -rf "\${BASE_DIR}" /usr/local/bin/selfssteal /usr/local/bin/selfsteal
+      echo "SelfSteal полностью удален."
+    fi
+    ;;
+  *)
+    echo "Использование: selfssteal [start | status | remove]"
+    ;;
+esac
+EOF
+chmod +x /usr/local/bin/selfssteal
+ln -sf /usr/local/bin/selfssteal /usr/local/bin/selfsteal
+
 SHORT_ID=$(openssl rand -hex 8 2>/dev/null || echo "a1b2c3d4e5f60718")
+if command -v xray >/dev/null 2>&1; then
+  X25519_OUT=$(xray x25519)
+  PRIVATE_KEY=$(echo "${X25519_OUT}" | awk '/Private key:/ {print $3}')
+else
+  PRIVATE_KEY="YOUR_X25519_PRIVATE_KEY"
+fi
 
 echo ""
 echo -e "${GREEN}========================================================================${NC}"
 echo -e "${BOLD}   УСТАНОВКА SELFSTEAL ЗАВЕРШЕНА! ДИРЕКТОРИЯ: ${BASE_DIR}${NC}"
 echo -e "${GREEN}========================================================================${NC}"
+echo -e " • Команды CLI:         selfssteal | selfssteal status | selfssteal remove"
 echo -e " • Конфиги веб-сервера: ${BASE_DIR}/conf/"
 echo -e " • Маскировочный HTML:  ${BASE_DIR}/html/index.html"
 echo -e " • Сертификаты SSL:     ${BASE_DIR}/ssl/fullchain.pem и privkey.pem"
 echo -e " • Логи запросов:       ${BASE_DIR}/logs/access.log и error.log"
 echo -e " • DNS запись A:        ${DOMAIN} -> ${SERVER_IPV4} (DNS Only)"
-echo -e " • Xray Reality Dest:   ${TARGET} | ServerNames: [\"${DOMAIN}\"]"
+echo ""
+echo -e "${BOLD}ЧТО ПРОПИСАТЬ В КОНФИГ XRAY (streamSettings):${NC}"
+if [[ "${TRANSPORT}" == "xhttp" ]]; then
+cat <<EOF
+  "streamSettings": {
+    "network": "xhttp",
+    "security": "reality",
+    "realitySettings": {
+      "show": false,
+      "dest": "${TARGET}",
+      "target": "${TARGET}",
+      "xver": 0,
+      "serverNames": [
+        "${DOMAIN}"
+      ],
+      "privateKey": "${PRIVATE_KEY}",
+      "shortIds": [
+        "${SHORT_ID}"
+      ],
+      "spiderX": "/"
+    },
+    "xhttpSettings": {
+      "path": "${XHTTP_PATH}",
+      "host": "${DOMAIN}",
+      "mode": "auto"
+    }
+  }
+EOF
+else
+cat <<EOF
+  "streamSettings": {
+    "network": "tcp",
+    "security": "reality",
+    "realitySettings": {
+      "show": false,
+      "dest": "${TARGET}",
+      "target": "${TARGET}",
+      "xver": 0,
+      "serverNames": [
+        "${DOMAIN}"
+      ],
+      "privateKey": "${PRIVATE_KEY}",
+      "shortIds": [
+        "${SHORT_ID}"
+      ],
+      "spiderX": "/"
+    },
+    "tcpSettings": {
+      "acceptProxyProtocol": false
+    }
+  }
+EOF
+fi
+

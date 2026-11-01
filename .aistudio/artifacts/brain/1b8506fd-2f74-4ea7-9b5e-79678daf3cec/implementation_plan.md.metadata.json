@@ -1,0 +1,6 @@
+{
+  "summary":  "План добавления глобальной CLI-утилиты selfssteal (start, status с Uptime и директориями SSL/HTML, remove) и автоматической сверки DNS домена через 1.1.1.1, 8.8.8.8 и 9.9.9.9 во время установки.",
+  "updatedAt":  "2026-11-01T20:28:05.075529550Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}
