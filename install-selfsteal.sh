@@ -3,9 +3,9 @@
 # 🔗 Docker SelfSteal Management System v2.6.0 — VLESS XHTTP / TCP Reality (Caddy / Nginx)
 # 👨‍💻 Author: t.me/wemkz
 # 🚀 Запуск одной командой (без ручного скачивания):
-#   bash <(curl -fsSL "https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh")
+#   bash <(curl -fsSL "https://raw.githubusercontent.com/wemkk1/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh")
 #   или:
-#   curl -fsSL "https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh" | bash
+#   curl -fsSL "https://raw.githubusercontent.com/wemkk1/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh" | bash
 # 🌍 Языки интерфейса: 1) English | 2) Русский
 # 🐳 Docker-режим: Caddy (caddy:2-alpine) или Nginx (nginx:stable-alpine) через Docker Compose
 # 🎲 Автоматический рандомный выбор HTML-заглушки из 6 шаблонов (1-speedtest .. 6-gitpage)
@@ -58,7 +58,7 @@ msg() {
 
 if [[ "${EUID}" -ne 0 ]]; then
   msg "❌ ${RED}[ERROR] Please run this script as root:${NC}" "❌ ${RED}[ОШИБКА] Запустите скрипт с правами root:${NC}"
-  echo -e "👉 ${CYAN}bash <(curl -fsSL "https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh")${NC}"
+  echo -e "👉 ${CYAN}bash <(curl -fsSL "https://raw.githubusercontent.com/wemkk1/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh")${NC}"
   exit 1
 fi
 echo ""
@@ -1292,7 +1292,7 @@ EOF
 cmd_reinstall() {
   print_header
   msg "🚀 ${CYAN}Running SelfSteal Installer / Reinstaller...${NC}" "🚀 ${CYAN}Запуск установки / переустановки SelfSteal...${NC}"
-  bash <(curl -fsSL "https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh")
+  bash <(curl -fsSL "https://raw.githubusercontent.com/wemkk1/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh")
 }
 
 cmd_start() {

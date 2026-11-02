@@ -56,7 +56,7 @@ export default function App() {
   const [config, setConfig] = useState<SelfStealConfig>(DEFAULT_CONFIG);
   const [activeTab, setActiveTab] = useState<ActiveTab>('simulator');
   const [githubRepo, setGithubRepo] = useState(
-    'https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh'
+    'https://raw.githubusercontent.com/wemkk1/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh'
   );
   const [oneLinerCopied, setOneLinerCopied] = useState<'process' | 'pipe' | null>(null);
   const [siteStats, setSiteStats] = useState<{
@@ -153,7 +153,7 @@ export default function App() {
     ? trimmedRepoInput
     : `https://raw.githubusercontent.com/${
         trimmedRepoInput.replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '') ||
-        'wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality'
+        'wemkk1/SelfSteal-VLESS-xHTTP-TCP-Reality'
       }/refs/heads/main/install-selfsteal.sh`;
   const bashProcessOneLiner = `bash <(curl -fsSL "${rawScriptUrl}")`;
   const bashPipeOneLiner = `curl -fsSL "${rawScriptUrl}" | bash`;
@@ -423,7 +423,7 @@ export default function App() {
                         type="text"
                         value={githubRepo}
                         onChange={(e) => setGithubRepo(e.target.value)}
-                        placeholder="https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh"
+                        placeholder="https://raw.githubusercontent.com/wemkk1/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh"
                         className="px-2.5 py-1 text-xs font-mono bg-[#0d0a1a] border border-slate-800 focus:border-sky-400 focus:outline-none rounded text-slate-100 w-full sm:w-80"
                       />
                     </div>

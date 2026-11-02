@@ -18,13 +18,13 @@
 ## 🚀 Быстрая установка на VPS (одной командой из GitHub без скачивания)
 
 ```bash
-bash <(curl -fsSL "https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh")
+bash <(curl -fsSL "https://raw.githubusercontent.com/wemkk1/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh")
 ```
 
 Или через пайп `curl | bash`:
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh" | bash
+curl -fsSL "https://raw.githubusercontent.com/wemkk1/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh" | bash
 ```
 
 ---
