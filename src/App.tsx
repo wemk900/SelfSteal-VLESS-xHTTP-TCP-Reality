@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
-import { Download, Copy, Check } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { Download, Copy, Check, Rocket, Eye } from 'lucide-react';
 import {
   type SelfStealConfig,
   validateConfig,
@@ -59,6 +59,57 @@ export default function App() {
     'https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh'
   );
   const [oneLinerCopied, setOneLinerCopied] = useState<'process' | 'pipe' | null>(null);
+  const [siteStats, setSiteStats] = useState<{
+    deploysDay: number;
+    deploysMonth: number;
+    deploysYear: number;
+    deploysTotal: number;
+    visitsDay: number;
+    visitsMonth: number;
+    visitsYear: number;
+    visitsTotal: number;
+  }>({
+    deploysDay: 0,
+    deploysMonth: 0,
+    deploysYear: 0,
+    deploysTotal: 0,
+    visitsDay: 0,
+    visitsMonth: 0,
+    visitsYear: 0,
+    visitsTotal: 0,
+  });
+
+  const refreshStats = useCallback(async () => {
+    try {
+      const res = await fetch('/api/stats');
+      const data = await res.json();
+      if (data?.ok && data.stats) {
+        setSiteStats(data.stats);
+      }
+    } catch {
+      // Ignore network errors
+    }
+  }, []);
+
+  useEffect(() => {
+    const visitedFlag = 'selfsteal_visit_recorded';
+    const alreadyRecorded = sessionStorage.getItem(visitedFlag);
+    if (!alreadyRecorded) {
+      sessionStorage.setItem(visitedFlag, '1');
+      fetch('/api/stats/visit', { method: 'POST' })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?.ok && data.stats) {
+            setSiteStats(data.stats);
+          }
+        })
+        .catch(() => {
+          refreshStats();
+        });
+    } else {
+      refreshStats();
+    }
+  }, [refreshStats]);
 
   const validation = useMemo(() => validateConfig(config), [config]);
   const baseDir = getBaseDirectory(config.webServer);
@@ -418,7 +469,11 @@ export default function App() {
 
             {/* TAB 1: SSH DEPLOY */}
             {activeTab === 'simulator' && (
-              <TerminalSimulator config={config} onChange={setConfig} />
+              <TerminalSimulator
+                config={config}
+                onChange={setConfig}
+                onDeploySuccess={refreshStats}
+              />
             )}
 
             {/* TAB 2: BASH INSTALL SCRIPT */}
@@ -632,13 +687,90 @@ export default function App() {
         </div>
       </main>
 
-      {/* Quiet Footer */}
-      <footer className="border-t border-slate-900 py-5 px-6 text-xs text-slate-500 mt-12">
-        <div className="max-w-[1380px] mx-auto flex flex-wrap items-center justify-between gap-4">
-          <span>SelfSteal Bash Architect · VLESS XHTTP / TCP Reality</span>
-          <span className="font-mono">
-            Директории: /opt/ss-caddy · /opt/nginx · Target: {fullTarget}
-          </span>
+      {/* Bottom Counter & Quiet Footer */}
+      <footer className="border-t border-slate-800/80 bg-[#0d0a1a] py-6 px-6 text-xs text-slate-400 mt-12">
+        <div className="max-w-[1380px] mx-auto space-y-4">
+          {/* Счетчик SSH деплоев (день / месяц / год) и посещений сайта */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="border border-slate-800 rounded-lg bg-[#13102a] p-4 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2.5">
+                <Rocket className="w-4 h-4 text-emerald-400 shrink-0" />
+                <div>
+                  <div className="text-xs font-semibold text-slate-100">
+                    Счетчик SSH-деплоев
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Установок в 1 клик через веб-панель
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 font-mono tabular-nums">
+                <div className="text-center">
+                  <div className="text-[10px] text-slate-400">За день</div>
+                  <div className="text-sm font-semibold text-emerald-400">
+                    {siteStats.deploysDay}
+                  </div>
+                </div>
+                <div className="h-6 w-px bg-slate-800" />
+                <div className="text-center">
+                  <div className="text-[10px] text-slate-400">За месяц</div>
+                  <div className="text-sm font-semibold text-sky-400">
+                    {siteStats.deploysMonth}
+                  </div>
+                </div>
+                <div className="h-6 w-px bg-slate-800" />
+                <div className="text-center">
+                  <div className="text-[10px] text-slate-400">За год</div>
+                  <div className="text-sm font-semibold text-slate-100">
+                    {siteStats.deploysYear}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="border border-slate-800 rounded-lg bg-[#13102a] p-4 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2.5">
+                <Eye className="w-4 h-4 text-sky-400 shrink-0" />
+                <div>
+                  <div className="text-xs font-semibold text-slate-100">
+                    Посещения сайта
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Сколько раз открывали веб-установщик
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 font-mono tabular-nums">
+                <div className="text-center">
+                  <div className="text-[10px] text-slate-400">За день</div>
+                  <div className="text-sm font-semibold text-sky-400">
+                    {siteStats.visitsDay}
+                  </div>
+                </div>
+                <div className="h-6 w-px bg-slate-800" />
+                <div className="text-center">
+                  <div className="text-[10px] text-slate-400">За месяц</div>
+                  <div className="text-sm font-semibold text-slate-200">
+                    {siteStats.visitsMonth}
+                  </div>
+                </div>
+                <div className="h-6 w-px bg-slate-800" />
+                <div className="text-center">
+                  <div className="text-[10px] text-slate-400">Всего входов</div>
+                  <div className="text-sm font-semibold text-emerald-400">
+                    {siteStats.visitsTotal}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-slate-800/60 text-slate-500">
+            <span>SelfSteal Bash Architect · VLESS XHTTP / TCP Reality · Author: t.me/wemkz</span>
+            <span className="font-mono">
+              Директории: /opt/ss-caddy · /opt/nginx · Target: {fullTarget}
+            </span>
+          </div>
         </div>
       </footer>
     </div>

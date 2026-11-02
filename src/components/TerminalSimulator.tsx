@@ -21,6 +21,7 @@ import {
 interface TerminalSimulatorProps {
   config: SelfStealConfig;
   onChange: (updater: (prev: SelfStealConfig) => SelfStealConfig) => void;
+  onDeploySuccess?: () => void;
 }
 
 interface LiveStepItem {
@@ -48,6 +49,7 @@ interface DeployCompleteSummary {
 
 export const TerminalSimulator: React.FC<TerminalSimulatorProps> = ({
   config,
+  onDeploySuccess,
 }) => {
   // SSH Connection Form State (in-memory only, never persisted)
   const [sshHost, setSshHost] = useState<string>(config.serverIp || '');
@@ -242,6 +244,7 @@ export const TerminalSimulator: React.FC<TerminalSimulatorProps> = ({
             } else if (event.type === 'complete') {
               setDeploySummary(event);
               if (event.ok) {
+                onDeploySuccess?.();
                 appendLiveLog(
                   'status',
                   `\n✅ Деплой SelfSteal успешно завершен! Заглушка: ${event.chosenStub}\n`

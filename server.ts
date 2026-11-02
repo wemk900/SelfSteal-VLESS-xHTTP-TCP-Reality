@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { Client, type ConnectConfig } from 'ssh2';
 import path from 'node:path';
+import fs from 'node:fs';
 import { createServer as createViteServer } from 'vite';
 import {
   type SelfStealConfig,
@@ -57,6 +58,116 @@ export type DeploySseEvent =
       httpsVerified: boolean;
       error?: string;
     };
+
+export interface SiteStatsSummary {
+  deploysDay: number;
+  deploysMonth: number;
+  deploysYear: number;
+  deploysTotal: number;
+  visitsDay: number;
+  visitsMonth: number;
+  visitsYear: number;
+  visitsTotal: number;
+}
+
+interface StoredStatsData {
+  deploysTotal: number;
+  visitsTotal: number;
+  deploysByDay: Record<string, number>;
+  deploysByMonth: Record<string, number>;
+  deploysByYear: Record<string, number>;
+  visitsByDay: Record<string, number>;
+  visitsByMonth: Record<string, number>;
+  visitsByYear: Record<string, number>;
+}
+
+const STATS_FILE_PATH = path.join(process.cwd(), 'stats.json');
+
+function getDateKeys(now = new Date()) {
+  const yyyy = String(now.getUTCFullYear());
+  const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(now.getUTCDate()).padStart(2, '0');
+  return {
+    dayKey: `${yyyy}-${mm}-${dd}`,
+    monthKey: `${yyyy}-${mm}`,
+    yearKey: yyyy,
+  };
+}
+
+function loadStoredStats(): StoredStatsData {
+  try {
+    if (fs.existsSync(STATS_FILE_PATH)) {
+      const raw = fs.readFileSync(STATS_FILE_PATH, 'utf-8');
+      const parsed = JSON.parse(raw) as Partial<StoredStatsData>;
+      return {
+        deploysTotal: Number(parsed.deploysTotal) || 0,
+        visitsTotal: Number(parsed.visitsTotal) || 0,
+        deploysByDay: parsed.deploysByDay || {},
+        deploysByMonth: parsed.deploysByMonth || {},
+        deploysByYear: parsed.deploysByYear || {},
+        visitsByDay: parsed.visitsByDay || {},
+        visitsByMonth: parsed.visitsByMonth || {},
+        visitsByYear: parsed.visitsByYear || {},
+      };
+    }
+  } catch {
+    // Fallback to empty stats if corrupted
+  }
+  return {
+    deploysTotal: 0,
+    visitsTotal: 0,
+    deploysByDay: {},
+    deploysByMonth: {},
+    deploysByYear: {},
+    visitsByDay: {},
+    visitsByMonth: {},
+    visitsByYear: {},
+  };
+}
+
+function saveStoredStats(data: StoredStatsData): void {
+  try {
+    fs.writeFileSync(STATS_FILE_PATH, JSON.stringify(data, null, 2), 'utf-8');
+  } catch {
+    // Ignore write errors in read-only environments
+  }
+}
+
+let statsStore: StoredStatsData = loadStoredStats();
+
+function getStatsSummary(): SiteStatsSummary {
+  const { dayKey, monthKey, yearKey } = getDateKeys();
+  return {
+    deploysDay: statsStore.deploysByDay[dayKey] || 0,
+    deploysMonth: statsStore.deploysByMonth[monthKey] || 0,
+    deploysYear: statsStore.deploysByYear[yearKey] || 0,
+    deploysTotal: statsStore.deploysTotal || 0,
+    visitsDay: statsStore.visitsByDay[dayKey] || 0,
+    visitsMonth: statsStore.visitsByMonth[monthKey] || 0,
+    visitsYear: statsStore.visitsByYear[yearKey] || 0,
+    visitsTotal: statsStore.visitsTotal || 0,
+  };
+}
+
+function recordSiteVisit(): SiteStatsSummary {
+  const { dayKey, monthKey, yearKey } = getDateKeys();
+  statsStore.visitsTotal = (statsStore.visitsTotal || 0) + 1;
+  statsStore.visitsByDay[dayKey] = (statsStore.visitsByDay[dayKey] || 0) + 1;
+  statsStore.visitsByMonth[monthKey] = (statsStore.visitsByMonth[monthKey] || 0) + 1;
+  statsStore.visitsByYear[yearKey] = (statsStore.visitsByYear[yearKey] || 0) + 1;
+  saveStoredStats(statsStore);
+  return getStatsSummary();
+}
+
+function recordSshDeploy(): SiteStatsSummary {
+  const { dayKey, monthKey, yearKey } = getDateKeys();
+  statsStore.deploysTotal = (statsStore.deploysTotal || 0) + 1;
+  statsStore.deploysByDay[dayKey] = (statsStore.deploysByDay[dayKey] || 0) + 1;
+  statsStore.deploysByMonth[monthKey] = (statsStore.deploysByMonth[monthKey] || 0) + 1;
+  statsStore.deploysByYear[yearKey] = (statsStore.deploysByYear[yearKey] || 0) + 1;
+  saveStoredStats(statsStore);
+  return getStatsSummary();
+}
 
 function buildSshConnectConfig(ssh: SshCredentials): ConnectConfig {
   const cfg: ConnectConfig = {
@@ -142,6 +253,16 @@ async function startServer() {
 
   app.use(cors());
   app.use(express.json({ limit: '5mb' }));
+
+  // 0. Site Visits & SSH Deploy Statistics
+  app.get('/api/stats', (_req, res) => {
+    res.json({ ok: true, stats: getStatsSummary() });
+  });
+
+  app.post('/api/stats/visit', (_req, res) => {
+    const stats = recordSiteVisit();
+    res.json({ ok: true, stats });
+  });
 
   // 1. Test SSH connection without storing credentials
   app.post('/api/ssh/test', async (req, res) => {
@@ -497,6 +618,7 @@ echo "VERIFY_SUMMARY:\${HTTPS_OK}:\${XRAY_STATE}"`
       });
 
       conn.end();
+      recordSshDeploy();
       sendEvent({
         type: 'complete',
         ok: true,
