@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Play,
-  RotateCcw,
   Terminal as TerminalIcon,
   CheckCircle2,
   XCircle,
@@ -16,9 +14,6 @@ import {
 } from 'lucide-react';
 import {
   type SelfStealConfig,
-  generateTerminalSummaryOutput,
-  generateCliCommandPreview,
-  normalizeXhttpPath,
   normalizeTargetAddress,
   getBaseDirectory,
 } from '../utils/generator';
@@ -26,10 +21,7 @@ import {
 interface TerminalSimulatorProps {
   config: SelfStealConfig;
   onChange: (updater: (prev: SelfStealConfig) => SelfStealConfig) => void;
-  initialMode?: ConsoleViewMode;
 }
-
-export type ConsoleViewMode = 'ssh-deploy' | 'install' | 'cli-start' | 'cli-status' | 'cli-remove';
 
 interface LiveStepItem {
   stepId: string;
@@ -56,13 +48,7 @@ interface DeployCompleteSummary {
 
 export const TerminalSimulator: React.FC<TerminalSimulatorProps> = ({
   config,
-  onChange,
-  initialMode = 'ssh-deploy',
 }) => {
-  const [step, setStep] = useState<number>(5);
-  const [consoleMode, setConsoleMode] = useState<ConsoleViewMode>(initialMode);
-  const [simulateDnsMismatch, setSimulateDnsMismatch] = useState<boolean>(false);
-
   // SSH Connection Form State (in-memory only, never persisted)
   const [sshHost, setSshHost] = useState<string>(config.serverIp || '');
   const [sshPort, setSshPort] = useState<number>(22);
@@ -96,13 +82,12 @@ export const TerminalSimulator: React.FC<TerminalSimulatorProps> = ({
   }, [config.serverIp, sshHost]);
 
   useEffect(() => {
-    if (logContainerRef.current && consoleMode === 'ssh-deploy') {
+    if (logContainerRef.current) {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
-  }, [liveLogs, consoleMode]);
+  }, [liveLogs]);
 
   const baseDir = getBaseDirectory(config.webServer);
-  const normPath = normalizeXhttpPath(config.xhttpPath, config.domain);
   const { fullTarget } = normalizeTargetAddress(config.target);
 
   const appendLiveLog = (type: LiveLogEntry['type'], text: string) => {
@@ -174,7 +159,6 @@ export const TerminalSimulator: React.FC<TerminalSimulatorProps> = ({
       return;
     }
 
-    setConsoleMode('ssh-deploy');
     setIsDeploying(true);
     setSshTestResult(null);
     setLiveSteps([]);
@@ -298,43 +282,10 @@ export const TerminalSimulator: React.FC<TerminalSimulatorProps> = ({
     }
   };
 
-  const startInteractiveWalkthrough = () => {
-    setConsoleMode('install');
-    setStep(1);
-  };
-
-  const getActiveTerminalCommandLabel = () => {
-    switch (consoleMode) {
-      case 'ssh-deploy':
-        return `ssh ${sshUser || 'root'}@${sshHost || config.serverIp}:${sshPort} — Live SSE Stream`;
-      case 'cli-start':
-        return 'root@vps:~# selfssteal';
-      case 'cli-status':
-        return 'root@vps:~# selfssteal status';
-      case 'cli-remove':
-        return 'root@vps:~# selfssteal remove';
-      default:
-        return 'root@vps:~# bash install-selfsteal.sh';
-    }
-  };
-
-  const getActiveTerminalOutput = () => {
-    switch (consoleMode) {
-      case 'cli-start':
-        return generateCliCommandPreview(config, 'start');
-      case 'cli-status':
-        return generateCliCommandPreview(config, 'status');
-      case 'cli-remove':
-        return generateCliCommandPreview(config, 'remove');
-      default:
-        return generateTerminalSummaryOutput(config, simulateDnsMismatch);
-    }
-  };
-
   return (
     <div className="space-y-5">
       {/* Блок 1: SSH подключение и Установка одной кнопкой */}
-      <div className="border border-slate-800 rounded-lg bg-slate-900/80 p-5 space-y-4">
+      <div className="border border-slate-800 rounded-lg bg-[#13102a] p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
           <div className="flex items-center gap-2.5">
             <Server className="w-4 h-4 text-sky-400 shrink-0" />
@@ -355,7 +306,7 @@ export const TerminalSimulator: React.FC<TerminalSimulatorProps> = ({
         {/* Поля SSH: Host, Port, User, Auth Mode */}
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
           <div className="sm:col-span-5">
-            <label htmlFor="ssh-host-input" className="block text-xs font-medium text-slate-300 mb-1">
+            <label htmlFor="ssh-host-input" className="block text-xs font-semibold text-slate-300 mb-1">
               IPv4 / Хост сервера
             </label>
             <input
@@ -364,12 +315,12 @@ export const TerminalSimulator: React.FC<TerminalSimulatorProps> = ({
               value={sshHost}
               onChange={(e) => setSshHost(e.target.value)}
               placeholder="185.212.140.42"
-              className="w-full px-3 py-2 text-xs font-mono bg-slate-950 border border-slate-800 focus:border-sky-400 focus:outline-none rounded-md text-slate-100"
+              className="w-full px-3 py-2 text-xs font-mono bg-[#0d0a1a] border border-slate-800 focus:border-sky-400 focus:outline-none rounded-md text-slate-100"
             />
           </div>
 
           <div className="sm:col-span-2">
-            <label htmlFor="ssh-port-input" className="block text-xs font-medium text-slate-300 mb-1">
+            <label htmlFor="ssh-port-input" className="block text-xs font-semibold text-slate-300 mb-1">
               SSH Порт
             </label>
             <input
@@ -379,12 +330,12 @@ export const TerminalSimulator: React.FC<TerminalSimulatorProps> = ({
               max={65535}
               value={sshPort}
               onChange={(e) => setSshPort(parseInt(e.target.value, 10) || 22)}
-              className="w-full px-3 py-2 text-xs font-mono tabular-nums bg-slate-950 border border-slate-800 focus:border-sky-400 focus:outline-none rounded-md text-slate-100"
+              className="w-full px-3 py-2 text-xs font-mono tabular-nums bg-[#0d0a1a] border border-slate-800 focus:border-sky-400 focus:outline-none rounded-md text-slate-100"
             />
           </div>
 
           <div className="sm:col-span-2">
-            <label htmlFor="ssh-user-input" className="block text-xs font-medium text-slate-300 mb-1">
+            <label htmlFor="ssh-user-input" className="block text-xs font-semibold text-slate-300 mb-1">
               Пользователь
             </label>
             <input
@@ -393,19 +344,19 @@ export const TerminalSimulator: React.FC<TerminalSimulatorProps> = ({
               value={sshUser}
               onChange={(e) => setSshUser(e.target.value)}
               placeholder="root"
-              className="w-full px-3 py-2 text-xs font-mono bg-slate-950 border border-slate-800 focus:border-sky-400 focus:outline-none rounded-md text-slate-100"
+              className="w-full px-3 py-2 text-xs font-mono bg-[#0d0a1a] border border-slate-800 focus:border-sky-400 focus:outline-none rounded-md text-slate-100"
             />
           </div>
 
           <div className="sm:col-span-3">
-            <span className="block text-xs font-medium text-slate-300 mb-1">
+            <span className="block text-xs font-semibold text-slate-300 mb-1">
               Метод входа
             </span>
-            <div className="grid grid-cols-2 gap-1 p-1 bg-slate-950 border border-slate-800 rounded-md">
+            <div className="grid grid-cols-2 gap-1 p-1 bg-[#0d0a1a] border border-slate-800 rounded-md">
               <button
                 type="button"
                 onClick={() => setAuthType('password')}
-                className={`px-2 py-1 text-xs font-medium rounded transition-colors cursor-pointer flex items-center justify-center gap-1 ${
+                className={`px-2 py-1 text-xs font-semibold rounded transition-colors cursor-pointer flex items-center justify-center gap-1 ${
                   authType === 'password'
                     ? 'bg-sky-500 text-slate-950 font-semibold'
                     : 'text-slate-400 hover:text-slate-200'
@@ -417,7 +368,7 @@ export const TerminalSimulator: React.FC<TerminalSimulatorProps> = ({
               <button
                 type="button"
                 onClick={() => setAuthType('privateKey')}
-                className={`px-2 py-1 text-xs font-medium rounded transition-colors cursor-pointer flex items-center justify-center gap-1 ${
+                className={`px-2 py-1 text-xs font-semibold rounded transition-colors cursor-pointer flex items-center justify-center gap-1 ${
                   authType === 'privateKey'
                     ? 'bg-sky-500 text-slate-950 font-semibold'
                     : 'text-slate-400 hover:text-slate-200'
@@ -433,7 +384,7 @@ export const TerminalSimulator: React.FC<TerminalSimulatorProps> = ({
         {/* Пароль или приватный ключ */}
         {authType === 'password' ? (
           <div>
-            <label htmlFor="ssh-password-input" className="block text-xs font-medium text-slate-300 mb-1">
+            <label htmlFor="ssh-password-input" className="block text-xs font-semibold text-slate-300 mb-1">
               Пароль SSH для {sshUser || 'root'}@{sshHost || 'server'}
             </label>
             <input
@@ -442,12 +393,12 @@ export const TerminalSimulator: React.FC<TerminalSimulatorProps> = ({
               value={sshPassword}
               onChange={(e) => setSshPassword(e.target.value)}
               placeholder="Введите пароль от root / VPS..."
-              className="w-full px-3 py-2 text-xs font-mono bg-slate-950 border border-slate-800 focus:border-sky-400 focus:outline-none rounded-md text-slate-100"
+              className="w-full px-3 py-2 text-xs font-mono bg-[#0d0a1a] border border-slate-800 focus:border-sky-400 focus:outline-none rounded-md text-slate-100"
             />
           </div>
         ) : (
           <div>
-            <label htmlFor="ssh-key-textarea" className="block text-xs font-medium text-slate-300 mb-1">
+            <label htmlFor="ssh-key-textarea" className="block text-xs font-semibold text-slate-300 mb-1">
               Приватный SSH-ключ (PEM / OpenSSH)
             </label>
             <textarea
@@ -456,7 +407,7 @@ export const TerminalSimulator: React.FC<TerminalSimulatorProps> = ({
               value={sshPrivateKey}
               onChange={(e) => setSshPrivateKey(e.target.value)}
               placeholder="-----BEGIN OPENSSH PRIVATE KEY-----..."
-              className="w-full px-3 py-2 text-xs font-mono bg-slate-950 border border-slate-800 focus:border-sky-400 focus:outline-none rounded-md text-slate-100"
+              className="w-full px-3 py-2 text-xs font-mono bg-[#0d0a1a] border border-slate-800 focus:border-sky-400 focus:outline-none rounded-md text-slate-100"
             />
           </div>
         )}
@@ -468,7 +419,7 @@ export const TerminalSimulator: React.FC<TerminalSimulatorProps> = ({
               type="button"
               disabled={testingSsh || isDeploying}
               onClick={handleTestSshConnection}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 border border-slate-700 rounded-md transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-200 bg-[#0d0a1a] hover:bg-slate-800 disabled:opacity-50 border border-slate-700 rounded-md transition-colors cursor-pointer"
             >
               {testingSsh ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-400" />
@@ -511,7 +462,7 @@ export const TerminalSimulator: React.FC<TerminalSimulatorProps> = ({
                 : 'bg-rose-950/30 border-rose-500/40 text-rose-300'
             }`}
           >
-            <div className="flex items-center gap-2 font-sans font-semibold">
+            <div className="flex items-center gap-2 font-semibold">
               {sshTestResult.ok ? (
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
               ) : (
@@ -592,11 +543,11 @@ export const TerminalSimulator: React.FC<TerminalSimulatorProps> = ({
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-300 font-medium">Готовая ссылка VLESS Reality URI:</span>
+                <span className="text-slate-300 font-semibold">Готовая ссылка VLESS Reality URI:</span>
                 <button
                   type="button"
                   onClick={() => handleCopyText('vless', deploySummary.vlessUri)}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded transition-colors cursor-pointer"
                 >
                   {copiedField === 'vless' ? (
                     <Check className="w-3.5 h-3.5" />
@@ -606,7 +557,7 @@ export const TerminalSimulator: React.FC<TerminalSimulatorProps> = ({
                   <span>{copiedField === 'vless' ? 'Скопировано' : 'Копировать VLESS URI'}</span>
                 </button>
               </div>
-              <div className="p-2.5 rounded bg-slate-950 border border-slate-800 font-mono text-xs text-emerald-300 break-all select-all">
+              <div className="p-2.5 rounded bg-[#0d0a1a] border border-slate-800 font-mono text-xs text-emerald-300 break-all select-all">
                 {deploySummary.vlessUri}
               </div>
             </div>
@@ -614,240 +565,12 @@ export const TerminalSimulator: React.FC<TerminalSimulatorProps> = ({
         )}
       </div>
 
-      {/* Блок 2: Переключатель режимов терминала (Live SSE / Симулятор / Команды selfssteal) */}
-      <div className="border border-slate-800 rounded-lg bg-slate-900/70 p-4 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-slate-400 mr-1">Режим консоли:</span>
-            <button
-              type="button"
-              onClick={() => setConsoleMode('ssh-deploy')}
-              className={`px-3 py-1.5 text-xs font-mono rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                consoleMode === 'ssh-deploy'
-                  ? 'bg-emerald-400 text-slate-950 font-semibold'
-                  : 'bg-slate-950 text-slate-300 border border-slate-800 hover:bg-slate-800'
-              }`}
-            >
-              🔴 Live SSH-стрим
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setConsoleMode('install');
-                setStep(5);
-              }}
-              className={`px-3 py-1.5 text-xs font-mono rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                consoleMode === 'install'
-                  ? 'bg-sky-500 text-slate-950 font-semibold'
-                  : 'bg-slate-950 text-slate-300 border border-slate-800 hover:bg-slate-800'
-              }`}
-            >
-              bash install-selfsteal.sh
-            </button>
-            <button
-              type="button"
-              onClick={() => setConsoleMode('cli-start')}
-              className={`px-3 py-1.5 text-xs font-mono rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                consoleMode === 'cli-start'
-                  ? 'bg-sky-500 text-slate-950 font-semibold'
-                  : 'bg-slate-950 text-slate-300 border border-slate-800 hover:bg-slate-800'
-              }`}
-            >
-              selfssteal (запуск)
-            </button>
-            <button
-              type="button"
-              onClick={() => setConsoleMode('cli-status')}
-              className={`px-3 py-1.5 text-xs font-mono rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                consoleMode === 'cli-status'
-                  ? 'bg-sky-500 text-slate-950 font-semibold'
-                  : 'bg-slate-950 text-slate-300 border border-slate-800 hover:bg-slate-800'
-              }`}
-            >
-              selfssteal status (Uptime + SSL/HTML)
-            </button>
-            <button
-              type="button"
-              onClick={() => setConsoleMode('cli-remove')}
-              className={`px-3 py-1.5 text-xs font-mono rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                consoleMode === 'cli-remove'
-                  ? 'bg-rose-500 text-slate-950 font-semibold'
-                  : 'bg-slate-950 text-slate-300 border border-slate-800 hover:bg-slate-800'
-              }`}
-            >
-              selfssteal remove (удалить)
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={startInteractiveWalkthrough}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Опрос по шагам (1 → 4)</span>
-            </button>
-            {consoleMode === 'install' && (
-              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={simulateDnsMismatch}
-                  onChange={(e) => setSimulateDnsMismatch(e.target.checked)}
-                  className="w-3.5 h-3.5 accent-amber-400 rounded cursor-pointer"
-                />
-                <span>Симулировать расхождение DNS</span>
-              </label>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Interactive step controls when stepping through 1..4 */}
-      {consoleMode === 'install' && step < 5 && (
-        <div className="border border-sky-500/40 rounded-lg bg-slate-900 p-4 space-y-4">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span className="font-mono text-sky-400">ШАГ ТЕРМИНАЛА {step} ИЗ 4</span>
-            <span>Введите ответ как в консоли Linux</span>
-          </div>
-
-          {step === 1 && (
-            <div className="space-y-3">
-              <div className="text-sm font-mono text-slate-200">
-                1) Выберите Docker веб-сервер для SelfSteal: [1] Caddy (/opt/ss-caddy) или [2] Nginx (/opt/nginx)
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onChange((prev) => ({ ...prev, webServer: 'caddy' }));
-                    setStep(2);
-                  }}
-                  className="px-4 py-2 text-xs font-mono font-medium bg-sky-500 text-slate-950 rounded-md hover:bg-sky-400 transition-colors cursor-pointer"
-                >
-                  Ввести 1 (Docker Caddy) → Enter
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onChange((prev) => ({ ...prev, webServer: 'nginx' }));
-                    setStep(2);
-                  }}
-                  className="px-4 py-2 text-xs font-mono font-medium bg-slate-800 text-slate-200 border border-slate-700 rounded-md hover:bg-slate-700 transition-colors cursor-pointer"
-                >
-                  Ввести 2 (Docker Nginx) → Enter
-                </button>
-              </div>
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="space-y-3">
-              <div className="text-sm font-mono text-slate-200">
-                2) Укажите ваш домен для SelfSteal (будет проверен у 1.1.1.1, 8.8.8.8, 9.9.9.9):
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <input
-                  type="text"
-                  aria-label="Домен в терминале"
-                  value={config.domain}
-                  onChange={(e) => onChange((prev) => ({ ...prev, domain: e.target.value }))}
-                  className="px-3 py-1.5 text-sm font-mono bg-slate-950 border border-slate-700 rounded-md text-slate-100"
-                />
-                <button
-                  type="button"
-                  onClick={() => setStep(3)}
-                  className="px-4 py-2 text-xs font-mono font-medium bg-sky-500 text-slate-950 rounded-md hover:bg-sky-400 transition-colors cursor-pointer"
-                >
-                  Подтвердить домен → Enter
-                </button>
-              </div>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div className="space-y-3">
-              <div className="text-sm font-mono text-slate-200">
-                3) Выберите транспорт: XHTTP (с запросом пути {config.domain}/media/v3/chunk/) или TCP:
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => onChange((prev) => ({ ...prev, transport: 'xhttp' }))}
-                  className={`px-3 py-1.5 text-xs font-mono rounded-md cursor-pointer ${
-                    config.transport === 'xhttp'
-                      ? 'bg-sky-500 text-slate-950 font-semibold'
-                      : 'bg-slate-800 text-slate-300'
-                  }`}
-                >
-                  [1] XHTTP
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onChange((prev) => ({ ...prev, transport: 'tcp' }))}
-                  className={`px-3 py-1.5 text-xs font-mono rounded-md cursor-pointer ${
-                    config.transport === 'tcp'
-                      ? 'bg-sky-500 text-slate-950 font-semibold'
-                      : 'bg-slate-800 text-slate-300'
-                  }`}
-                >
-                  [2] TCP
-                </button>
-                {config.transport === 'xhttp' && (
-                  <input
-                    type="text"
-                    aria-label="Путь XHTTP в терминале"
-                    value={config.xhttpPath}
-                    onChange={(e) => onChange((prev) => ({ ...prev, xhttpPath: e.target.value }))}
-                    placeholder="/media/v3/chunk/"
-                    className="px-3 py-1.5 text-sm font-mono bg-slate-950 border border-slate-700 rounded-md text-slate-100"
-                  />
-                )}
-                <button
-                  type="button"
-                  onClick={() => setStep(4)}
-                  className="px-4 py-2 text-xs font-mono font-medium bg-sky-500 text-slate-950 rounded-md hover:bg-sky-400 transition-colors cursor-pointer"
-                >
-                  Далее → Enter
-                </button>
-              </div>
-            </div>
-          )}
-
-          {step === 4 && (
-            <div className="space-y-3">
-              <div className="text-sm font-mono text-slate-200">
-                4) На каком порту будет target (по умолчанию 127.0.0.1:9443):
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <input
-                  type="text"
-                  aria-label="Target в терминале"
-                  value={config.target}
-                  onChange={(e) => onChange((prev) => ({ ...prev, target: e.target.value }))}
-                  placeholder="127.0.0.1:9443"
-                  className="px-3 py-1.5 text-sm font-mono bg-slate-950 border border-slate-700 rounded-md text-slate-100"
-                />
-                <button
-                  type="button"
-                  onClick={() => setStep(5)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-mono font-medium bg-emerald-400 text-slate-950 rounded-md hover:bg-emerald-300 transition-colors cursor-pointer"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Запустить установку и проверку DNS → Enter</span>
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Terminal Output Console */}
-      <div className="border border-slate-800 rounded-lg bg-slate-950 overflow-hidden">
-        <div className="px-4 py-2.5 border-b border-slate-800 bg-slate-900 flex items-center justify-between">
+      <div className="border border-slate-800 rounded-lg bg-[#0d0a1a] overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-slate-800 bg-[#13102a] flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs font-mono text-slate-300">
             <TerminalIcon className="w-3.5 h-3.5 text-sky-400" />
-            <span>{getActiveTerminalCommandLabel()}</span>
+            <span>{`ssh ${sshUser || 'root'}@${sshHost || config.serverIp}:${sshPort} — Live SSE Stream`}</span>
           </div>
           <div className="text-xs font-mono text-slate-400">
             Docker {config.webServer === 'caddy' ? 'Caddy' : 'Nginx'} · {baseDir} · {fullTarget}
@@ -857,51 +580,37 @@ export const TerminalSimulator: React.FC<TerminalSimulatorProps> = ({
           ref={logContainerRef}
           className="p-5 overflow-x-auto max-h-[540px] overflow-y-auto"
         >
-          {consoleMode === 'ssh-deploy' ? (
-            liveLogs.length > 0 ? (
-              <div className="text-xs font-mono leading-relaxed whitespace-pre-wrap space-y-0.5">
-                {liveLogs.map((entry) => (
-                  <span
-                    key={entry.id}
-                    className={
-                      entry.type === 'command'
-                        ? 'text-sky-400 font-semibold block mt-2'
-                        : entry.type === 'stderr'
-                        ? 'text-rose-400'
-                        : entry.type === 'status'
-                        ? 'text-emerald-400 font-semibold'
-                        : 'text-slate-200'
-                    }
-                  >
-                    {entry.text}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <pre className="text-xs font-mono leading-relaxed text-slate-400 whitespace-pre-wrap">
+          {liveLogs.length > 0 ? (
+            <div className="text-xs font-mono leading-relaxed whitespace-pre-wrap space-y-0.5">
+              {liveLogs.map((entry) => (
+                <span
+                  key={entry.id}
+                  className={
+                    entry.type === 'command'
+                      ? 'text-sky-400 font-semibold block mt-2'
+                      : entry.type === 'stderr'
+                      ? 'text-rose-400'
+                      : entry.type === 'status'
+                      ? 'text-emerald-400 font-semibold'
+                      : 'text-slate-200'
+                  }
+                >
+                  {entry.text}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <pre className="text-xs font-mono leading-relaxed text-slate-400 whitespace-pre-wrap">
 {`🔗 Готов к удаленному SSH-деплою одной кнопкой (${sshUser || 'root'}@${sshHost || config.serverIp}:${sshPort})
 ──────────────────────────────────────────────────────────────────────────
 1. Укажите IP сервера и пароль (или приватный SSH-ключ) в форме выше.
 2. Нажмите «Проверить соединение» для тестового рукопожатия ssh2.
 3. Нажмите «Установить одной кнопкой на сервер» — все команды и вывод stdout/stderr появятся здесь в реальном времени через SSE.
-   • Автоматическая проверка и скрытая установка Docker + Docker Compose (если не установлен)
+   • Автоматическая проверка и установка Docker + Docker Compose (если не установлен)
    • Автозаливка выбранной HTML-заглушки по SFTP/SCP в ${baseDir}/html/ и /var/www/html/
-   • Скрытый выпуск SSL сертификата Let's Encrypt и запуск контейнера selfsteal-${config.webServer}
+   • Выпуск SSL сертификата Let's Encrypt и запуск контейнера selfsteal-${config.webServer}
    • Пост-деплой проверка curl -sk https://${config.domain} и вывод готовой VLESS ссылки`}
-              </pre>
-            )
-          ) : (
-            <>
-              <pre className="text-xs font-mono leading-relaxed text-slate-200 whitespace-pre">
-                {getActiveTerminalOutput()}
-              </pre>
-              {consoleMode === 'install' && config.transport === 'xhttp' && (
-                <div className="mt-4 pt-4 border-t border-slate-800/80 text-xs font-mono text-emerald-400">
-                  ✓ Проверка маршрута XHTTP SelfSteal: https://{config.domain}
-                  {normPath} -&gt; {fullTarget} (TLS 1.3 + Let&apos;s Encrypt)
-                </div>
-              )}
-            </>
+            </pre>
           )}
         </div>
       </div>

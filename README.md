@@ -7,17 +7,15 @@
 ![Transport](https://img.shields.io/badge/VLESS-XHTTP%20Reality-10b981?style=flat-square)
 ![Author](https://img.shields.io/badge/Author-t.me%2Fwemkz-8b5cf6?style=flat-square)
 
-Цветной Bash-установщик **`install-selfsteal.sh`** для развертывания **Docker-контейнера SelfSteal** (**Caddy** `caddy:2-alpine` в `/opt/ss-caddy` или **Nginx** `nginx:stable-alpine` в `/opt/nginx`) под **VLESS + XHTTP / TCP + Reality**:
-- 🐳 **Полная контейнеризация (Docker Compose)**: если Docker и Docker Compose еще не установлены на сервере, скрипт **автоматически установит их сам в фоновом (скрытом) режиме**.
-- 🤫 **Чистый терминал без мусора**: весь процесс установки системных пакетов, Docker и выпуска сертификата Let's Encrypt выполняется в **скрытом режиме** (`>/dev/null 2>&1`) с аккуратными индикаторами выполнения.
-- 🎲 **6 встроенных HTML-заглушек**: автоматический случайный выбор (`RANDOM % 6`) при установке + мгновенная смена командой `selfssteal template`.
-- 🌐 **Автопроверка DNS**: сверка `A`-записи домена у `1.1.1.1`, `8.8.8.8` и `9.9.9.9`.
+Двуязычный (🇬🇧 **English** / 🇷🇺 **Русский**) Bash-установщик **`install-selfsteal.sh`** для развертывания **Docker-контейнера SelfSteal** (**Caddy** `caddy:2-alpine` в `/opt/ss-caddy` или **Nginx** `nginx:stable-alpine` в `/opt/nginx`) под **VLESS + XHTTP / TCP + Reality**:
+- 🌍 **Выбор языка при старте**: `1) English` или `2) Русский` — весь дальнейший интерфейс и CLI-меню работают на выбранном языке.
+- 🐳 **Полная контейнеризация (Docker Compose)**: автоматическая установка Docker и развертывание контейнера с реальным выводом всех команд.
+- 🎲 **6 встроенных HTML-заглушек**: автоматический случайный выбор (`RANDOM % 6`) при установке + мгновенная смена через меню `selfssteal`.
+- 🛠️ **Интерактивное меню `selfssteal` (0–14)**: управление сервисом, смена шаблона, смена домена с перевыпуском SSL, переключение `Caddy ↔ Nginx`, просмотр и очистка логов, редактирование конфига и удаление.
 
 ---
 
 ## 🚀 Быстрая установка на VPS (одной командой из GitHub без скачивания)
-
-Запустите установщик напрямую через `bash <(curl ...)` (интерактивный ввод работает через `/dev/tty`):
 
 ```bash
 bash <(curl -fsSL "https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh")
@@ -31,9 +29,55 @@ curl -fsSL "https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-
 
 ---
 
-## 🎨 6 встроенных HTML-заглушек (Рандомный выбор при установке)
+## 🛠️ Интерактивное меню `selfssteal` (0–14)
 
-Во время установки скрипт сохраняет все 6 реалистичных HTML-шаблонов в `/opt/ss-caddy/html/templates/` и **автоматически выбирает случайный шаблон (`RANDOM % 6`)** в `/opt/ss-caddy/html/index.html`. Переключить шаблон можно в любой момент командой `selfssteal template`:
+При установке автоматически создается глобальный symlink **`/usr/local/bin/selfssteal -> /opt/ss-caddy/selfssteal.sh`**. Запуск команды `selfssteal` открывает интерактивное меню с текущим статусом (Running/Stopped, домен, сервер, остаток дней SSL):
+
+```text
+root@vps:~# selfssteal
+🔗 Docker Caddy for Reality SelfSteal
+Management System v2.6.0 (Docker Compose)
+Project: VLESS XHTTP Reality | Author: t.me/wemkz
+──────────────────────────────────────────
+
+✅ Status: Running
+   Server:  Caddy (caddy:2-alpine)
+   Domain:  poland.example.xyz
+   Port:    9443 (127.0.0.1:9443)
+   SSL:     ✅ Valid, 73 days left (Let's Encrypt)
+
+Service Management:
+   1) Install / Reinstall
+   2) Start service
+   3) Stop service
+   4) Restart service
+   5) Service status
+
+Website Management:
+   6) Change HTML template (1-6 или Random)
+   7) Change domain
+   8) Switch web server (Caddy ↔ Nginx)
+
+Logs & Monitoring:
+   9)  View logs (tail -f)
+   10) Log sizes
+   11) Clean logs
+
+SSL:
+   12) Renew SSL certificate
+   13) Edit web server config
+
+Maintenance:
+   14) Uninstall SelfSteal
+
+   0) Exit
+
+Select option [0-14]: 
+```
+
+---
+
+## 🎨 6 встроенных HTML-заглушек (Рандомный выбор при установке)
 
 | № | Файл шаблона | Описание маскировочной страницы |
 | :--- | :--- | :--- |
@@ -46,113 +90,26 @@ curl -fsSL "https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-
 
 ---
 
-## 🛠️ Управление через CLI команду `selfssteal`
-
-При установке автоматически создается глобальный symlink **`/usr/local/bin/selfssteal -> /opt/ss-caddy/selfssteal.sh`**:
-
-| Команда | Описание |
-| :--- | :--- |
-| `selfssteal start` | ▶️ Запустить Docker-контейнер SelfSteal (`selfsteal-caddy`) и показать статус |
-| `selfssteal status` | 📊 Показать статус контейнера, **Uptime сервера и контейнера**, срок SSL, активный HTML-шаблон и пути к **SSL / HTML** |
-| `selfssteal template` | 🎨 Выбрать один из 6 шаблонов заглушки (`1-speedtest.html` .. `6-gitpage.html`) или случайный |
-| `selfssteal menu` | 📋 Открыть интерактивное меню управления (опции 1–14) |
-| `selfssteal remove` | 🗑️ Полностью остановить и удалить Docker-контейнер SelfSteal, очистить Cron, директорию `/opt/ss-caddy` и symlink |
-| `selfssteal restart` | 🔄 Перезапустить Docker-контейнер без потери конфигурации |
-| `selfssteal logs` | 📝 Открыть поток логов запросов (`/opt/ss-caddy/logs/access.log`) в реальном времени |
-
-### Пример вывода `selfssteal status`:
-
-```text
-root@vps:~# selfssteal status
-🔗 Docker Caddy for Reality SelfSteal
-Management System v2.6.0 (Docker Compose)
-Project: VLESS XHTTP Reality | Author: t.me/wemkz
-──────────────────────────────────────────
-
-✅ Status: Running (Container: selfsteal-caddy, PID: 2418)
-   Server:             Docker Caddy (caddy:2-alpine)
-   Domain:             poland.example.xyz
-   Transport:          VLESS XHTTP Reality (poland.example.xyz/media/v3/chunk/)
-   Port:               9443 (Target: 127.0.0.1:9443)
-   Uptime сервера:     ⏱️  42 days, 11 hours, 28 minutes
-   Uptime контейнера:  🐳 14d 06:42:19 (запущен: 2026-10-18 05:12:00 UTC)
-   SSL:                ✅ Valid, 73 days left (Let's Encrypt)
-   Template:           🎨 🚀 1-speedtest.html (Спидтест с анимированным гейджем и цифрами)
-
-📂 Директории и пути (/opt/ss-caddy):
-   ├─ 🔒 Путь к SSL:      /opt/ss-caddy/ssl (fullchain.pem, privkey.pem, renew-hook.sh)
-   ├─ 🎨 Путь к HTML:     /opt/ss-caddy/html (index.html + 6 шаблонов в /templates)
-   ├─ 🐳 Docker Compose:  /opt/ss-caddy/docker-compose.yml
-   ├─ ⚙️  Конфигурация:    /opt/ss-caddy/conf/Caddyfile
-   ├─ 📝 Логи запросов:   /opt/ss-caddy/logs (access.log, error.log)
-   └─ 🔗 Глобальный CLI:  /usr/local/bin/selfssteal -> /opt/ss-caddy/selfssteal.sh
-
-📋 Available Operations:
-
-🔧 Docker Service Management:
-   1) 🚀 Reconfigure Docker Caddy
-   2) ▶️  Start container        (selfssteal start)
-   3) ⏹️  Stop container
-   4) 🔄 Restart container      (selfssteal restart)
-   5) 📊 Container status       (selfssteal status)
-
-🎨 Website Management:
-   6) 🎨 Website templates      (selfssteal template — Random 1-6)
-   7) 📖 Setup guide & streamSettings
-
-📝 Logs & Monitoring:
-   8) 📝 View logs              (selfssteal logs)
-   9) 📊 Log sizes
-   10) 🧹 Clean logs
-   11) ✏️  Edit configuration
-   12) 🔒 Renew SSL certificate
-
-🗑️  Maintenance:
-   13) 🗑️  Uninstall selfsteal-caddy  (selfssteal remove)
-   14) 🌐 Check DNS (1.1.1.1 / 8.8.8.8 / 9.9.9.9)
-
-   0) ⬅️  Exit
-
-💡 Tip: Use 'selfssteal template' or option 6 to customize website templates
-```
-
----
-
 ## 📂 Структура директории `/opt/ss-caddy`
 
 ```text
 /usr/local/bin/selfssteal ─────────► symlink на /opt/ss-caddy/selfssteal.sh
 /opt/ss-caddy/
 ├── docker-compose.yml              # Docker Compose манифест (selfsteal-caddy, caddy:2-alpine, host network)
-├── selfssteal.sh                   # Цветная CLI утилита управления (Author: t.me/wemkz)
+├── selfssteal.sh                   # CLI утилита и интерактивное меню 0-14 (Author: t.me/wemkz)
 ├── conf/
 │   └── Caddyfile                  # Конфигурация Caddy (слушает 127.0.0.1:9443)
 ├── html/
 │   ├── index.html                  # Активная HTML-заглушка (выбранная случайно из 6)
-│   └── templates/
-│       ├── 1-speedtest.html        # 🚀 Спидтест с анимированным гейджем
-│       ├── 2-cloud.html            # ☁️ Облачное хранилище
-│       ├── 3-memes.html            # 😂 Лента с мемами
-│       ├── 4-overloaded.html       # ⚠️ Сервис перегружен (503)
-│       ├── 5-tech.html             # 💻 Технический лендинг (Nexora Systems)
-│       └── 6-gitpage.html          # 🐙 Репозиторий GitPage (wemk / core-infra)
+│   └── templates/                  # Все 6 HTML-шаблонов (1-speedtest .. 6-gitpage)
 ├── ssl/
 │   ├── fullchain.pem               # Сертификат Let's Encrypt (ECC P-256)
 │   ├── privkey.pem                 # Приватный ключ TLS (chmod 600)
-│   └── renew-hook.sh               # Скрипт автообновления по Cron (перезагружает Docker-контейнер)
+│   └── renew-hook.sh               # Скрипт автообновления по Cron
 └── logs/
-    ├── access.log                  # Логи входящих запросов (JSON, ротация 14 дн.)
+    ├── access.log                  # Логи входящих запросов
     └── error.log                   # Логи ошибок и предупреждений TLS
 ```
-
----
-
-## 🌐 Доменные записи (DNS) для `poland.example.xyz`
-
-| Тип | Имя | Значение | TTL | Режим проксирования |
-| :--- | :--- | :--- | :--- | :--- |
-| **A** | `poland.example.xyz` | `185.212.140.42` | `300 (Auto)` | **DNS Only (Без облачка Cloudflare)** |
-| **CAA** | `@` | `0 issue "letsencrypt.org"` | `3600` | **DNS Only** |
 
 ---
 
@@ -172,17 +129,14 @@ Project: VLESS XHTTP Reality | Author: t.me/wemkz
     "security": "reality",
     "realitySettings": {
       "show": false,
-      "dest": "127.0.0.1:9443",
-      "target": "127.0.0.1:9443",
-      "xver": 0,
       "serverNames": [
         "poland.example.xyz"
       ],
       "privateKey": "YOUR_X25519_PRIVATE_KEY",
+      "publicKey": "YOUR_X25519_PUBLIC_KEY",
       "shortIds": [
         "a1b2c3d4e5f60718"
-      ],
-      "spiderX": "/"
+      ]
     },
     "xhttpSettings": {
       "path": "/media/v3/chunk/",

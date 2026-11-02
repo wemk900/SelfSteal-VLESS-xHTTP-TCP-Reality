@@ -52,8 +52,8 @@ export const DirectoryExplorer: React.FC<DirectoryExplorerProps> = ({ config }) 
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           {/* Дерево файлов */}
-          <div className="lg:col-span-5 border border-slate-800 rounded-lg bg-slate-900/70 overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-800 bg-slate-900 flex items-center gap-2">
+          <div className="lg:col-span-5 border border-slate-800 rounded-lg bg-[#13102a] overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-800 bg-[#13102a] flex items-center gap-2">
               <Folder className="w-4 h-4 text-sky-400 shrink-0" />
               <span className="text-xs font-mono font-semibold text-slate-200">{baseDir}/</span>
             </div>
@@ -68,7 +68,7 @@ export const DirectoryExplorer: React.FC<DirectoryExplorerProps> = ({ config }) 
                     className={`w-full text-left px-4 py-3 transition-colors flex items-start gap-3 cursor-pointer ${
                       isSelected
                         ? 'bg-sky-500/10 text-sky-300'
-                        : 'hover:bg-slate-800/60 text-slate-300'
+                        : 'hover:bg-[#0d0a1a]/60 text-slate-300'
                     }`}
                   >
                     <FileText
@@ -77,7 +77,7 @@ export const DirectoryExplorer: React.FC<DirectoryExplorerProps> = ({ config }) 
                       }`}
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="text-xs font-mono font-medium truncate">
+                      <div className="text-xs font-mono font-semibold truncate">
                         {item.path}
                       </div>
                       <div className="text-xs text-slate-400 mt-0.5 line-clamp-2">
@@ -119,21 +119,21 @@ export const DirectoryExplorer: React.FC<DirectoryExplorerProps> = ({ config }) 
           </div>
         </div>
 
-        <div className="border border-slate-800 rounded-lg bg-slate-900/70 overflow-x-auto">
+        <div className="border border-slate-800 rounded-lg bg-[#13102a] overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-slate-800 text-xs text-slate-400 bg-slate-900">
-                <th className="py-3 px-4 font-medium">Тип</th>
-                <th className="py-3 px-4 font-medium">Имя (Host)</th>
-                <th className="py-3 px-4 font-medium">Значение (Target / IP)</th>
-                <th className="py-3 px-4 font-medium">TTL</th>
-                <th className="py-3 px-4 font-medium">Режим проксирования</th>
-                <th className="py-3 px-4 font-medium">Назначение</th>
+              <tr className="border-b border-slate-800 text-xs text-slate-400 bg-[#13102a]">
+                <th className="py-3 px-4 font-semibold">Тип</th>
+                <th className="py-3 px-4 font-semibold">Имя (Host)</th>
+                <th className="py-3 px-4 font-semibold">Значение (Target / IP)</th>
+                <th className="py-3 px-4 font-semibold">TTL</th>
+                <th className="py-3 px-4 font-semibold">Режим проксирования</th>
+                <th className="py-3 px-4 font-semibold">Назначение</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/70 text-xs">
               {dnsRecords.map((rec, i) => (
-                <tr key={i} className="hover:bg-slate-800/40 transition-colors">
+                <tr key={i} className="hover:bg-[#0d0a1a]/40 transition-colors">
                   <td className="py-3 px-4 font-mono font-semibold text-sky-400 whitespace-nowrap">
                     {rec.type}
                   </td>
@@ -160,7 +160,7 @@ export const DirectoryExplorer: React.FC<DirectoryExplorerProps> = ({ config }) 
       </section>
 
       {/* Памятка по управлению сервисом через CLI selfssteal */}
-      <section className="border border-slate-800 rounded-lg bg-slate-900/60 p-5 space-y-3">
+      <section className="border border-slate-800 rounded-lg bg-[#13102a] p-5 space-y-3">
         <div className="flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
           <h4 className="text-sm font-semibold text-slate-100">
@@ -168,19 +168,19 @@ export const DirectoryExplorer: React.FC<DirectoryExplorerProps> = ({ config }) 
           </h4>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-          <div className="p-3 rounded-md bg-slate-950 border border-slate-800 space-y-1">
+          <div className="p-3 rounded-md bg-[#0d0a1a] border border-slate-800 space-y-1">
             <div className="text-slate-400">Запустить SelfSteal</div>
             <div className="font-mono text-emerald-400 select-all">
               selfssteal
             </div>
           </div>
-          <div className="p-3 rounded-md bg-slate-950 border border-slate-800 space-y-1">
+          <div className="p-3 rounded-md bg-[#0d0a1a] border border-slate-800 space-y-1">
             <div className="text-slate-400">Статус, Uptime и директории SSL / HTML</div>
             <div className="font-mono text-sky-400 select-all">
               selfssteal status
             </div>
           </div>
-          <div className="p-3 rounded-md bg-slate-950 border border-slate-800 space-y-1">
+          <div className="p-3 rounded-md bg-[#0d0a1a] border border-slate-800 space-y-1">
             <div className="text-slate-400">Полное удаление SelfSteal и директорий</div>
             <div className="font-mono text-rose-400 select-all">
               selfssteal remove

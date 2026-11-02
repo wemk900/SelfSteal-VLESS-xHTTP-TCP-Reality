@@ -51,8 +51,8 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({
   const lineCount = code.split('\n').length;
 
   return (
-    <div className="border border-slate-800 rounded-lg bg-slate-900/80 overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-3 border-b border-slate-800 bg-slate-900">
+    <div className="border border-slate-800 rounded-lg bg-[#13102a] overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-3 border-b border-slate-800 bg-[#13102a]">
         <div className="min-w-0">
           <div className="text-sm font-semibold text-slate-100 truncate">{title}</div>
           {subtitle && (
@@ -67,7 +67,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({
           <button
             type="button"
             onClick={handleCopy}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-200 bg-[#0d0a1a] hover:bg-slate-800 border border-slate-700 rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
             <span>{copied ? 'Скопировано' : 'Копировать код'}</span>
@@ -76,7 +76,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({
             <button
               type="button"
               onClick={handleDownload}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-950 bg-sky-400 hover:bg-sky-300 rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-950 bg-sky-400 hover:bg-sky-300 rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Скачать {filename}</span>
@@ -84,7 +84,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({
           )}
         </div>
       </div>
-      <div className={`overflow-auto ${maxHeight} p-4 bg-slate-950/90`}>
+      <div className={`overflow-auto ${maxHeight} p-4 bg-[#0d0a1a]`}>
         <pre className="text-xs leading-relaxed font-mono text-slate-200 select-all whitespace-pre">
           <code>{code}</code>
         </pre>

@@ -404,14 +404,25 @@ STUB_EOF_${tpl.index}`
   "5-tech.html"
   "6-gitpage.html"
 )
-STUB_DESCRIPTIONS=(
-  "🚀 1-speedtest.html — Спидтест с анимированным гейджем и цифрами"
-  "☁️ 2-cloud.html     — Облачное хранилище, сайдбар + сетка файлов"
-  "😂 3-memes.html     — Лента с мемами (MemeDump), тёмная тема"
-  "⚠️ 4-overloaded.html— Страница 'Сервис перегружен' (503) с прогресс-баром"
-  "💻 5-tech.html      — Технический лендинг (Nexora Systems)"
-  "🐙 6-gitpage.html   — Страница репозитория в стиле GitHub (GitPage)"
-)
+if [[ "\${LANG_CODE:-ru}" == "en" ]]; then
+  STUB_DESCRIPTIONS=(
+    "🚀 1-speedtest.html — Speedtest with animated gauge and metrics"
+    "☁️ 2-cloud.html     — Cloud storage, sidebar + file grid"
+    "😂 3-memes.html     — Meme feed (MemeDump), dark theme"
+    "⚠️ 4-overloaded.html— 'Service Overloaded' (503) page with progress bar"
+    "💻 5-tech.html      — Tech landing page (Nexora Systems)"
+    "🐙 6-gitpage.html   — GitHub-style repository page (GitPage)"
+  )
+else
+  STUB_DESCRIPTIONS=(
+    "🚀 1-speedtest.html — Спидтест с анимированным гейджем и цифрами"
+    "☁️ 2-cloud.html     — Облачное хранилище, сайдбар + сетка файлов"
+    "😂 3-memes.html     — Лента с мемами (MemeDump), тёмная тема"
+    "⚠️ 4-overloaded.html— Страница 'Сервис перегружен' (503) с прогресс-баром"
+    "💻 5-tech.html      — Технический лендинг (Nexora Systems)"
+    "🐙 6-gitpage.html   — Страница репозитория в стиле GitHub (GitPage)"
+  )
+fi
 RANDOM_IDX=\$(( RANDOM % \${#STUB_FILES[@]} ))
 CHOSEN_STUB="\${STUB_FILES[\$RANDOM_IDX]}"
 CHOSEN_DESC="\${STUB_DESCRIPTIONS[\$RANDOM_IDX]}"`
@@ -425,6 +436,11 @@ ${heredocs}
 ${selectionLogic}
 cp -f "\${BASE_DIR}/html/templates/\${CHOSEN_STUB}" "\${BASE_DIR}/html/index.html"
 echo "\${CHOSEN_STUB}" > "\${BASE_DIR}/html/.current_template"
-echo -e "   🎲 Выбрана заглушка: \${GREEN}\${CHOSEN_DESC}\${NC}"
-echo -e "   📂 Все 6 шаблонов сохранены в: \${CYAN}\${BASE_DIR}/html/templates/\${NC}"`;
+if [[ "\${LANG_CODE:-ru}" == "en" ]]; then
+  echo -e "   🎲 Selected stub template: \${GREEN}\${CHOSEN_DESC}\${NC}"
+  echo -e "   📂 All 6 templates saved in: \${CYAN}\${BASE_DIR}/html/templates/\${NC}"
+else
+  echo -e "   🎲 Выбрана заглушка: \${GREEN}\${CHOSEN_DESC}\${NC}"
+  echo -e "   📂 Все 6 шаблонов сохранены в: \${CYAN}\${BASE_DIR}/html/templates/\${NC}"
+fi`;
 }

@@ -54,7 +54,7 @@ const DEFAULT_CONFIG: SelfStealConfig = {
 
 export default function App() {
   const [config, setConfig] = useState<SelfStealConfig>(DEFAULT_CONFIG);
-  const [activeTab, setActiveTab] = useState<ActiveTab>('bash');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('simulator');
   const [githubRepo, setGithubRepo] = useState(
     'https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh'
   );
@@ -71,7 +71,6 @@ export default function App() {
   const webServerConfig = useMemo(() => generateWebServerConfig(config), [config]);
   const sslRenewScript = useMemo(() => generateSslRenewalScript(config), [config]);
   const logrotateConfig = useMemo(() => generateLogrotateConfig(config), [config]);
-  const vlessUri = useMemo(() => generateVlessClientUri(config), [config]);
   const githubReadme = useMemo(() => generateGithubReadme(config), [config]);
 
   const handleRegenerateKeys = () => {
@@ -120,24 +119,36 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      {/* Top Bar Contract: 3 zones separated by gap-8 */}
-      <header className="flex items-center justify-between gap-8 px-6 py-4 border-b border-slate-800 bg-slate-950/90 sticky top-0 z-30 backdrop-blur-sm">
+    <div className="min-h-screen bg-[#0d0a1a] text-slate-100 flex flex-col">
+      {/* Top Bar Contract */}
+      <header className="flex items-center justify-between gap-4 px-5 py-3.5 border-b border-slate-800 bg-[#0d0a1a]/95 sticky top-0 z-30 backdrop-blur-sm">
         <a
           href="#top"
           onClick={(e) => {
             e.preventDefault();
-            setActiveTab('bash');
+            setActiveTab('simulator');
           }}
-          className="text-lg font-bold tracking-tight text-slate-100 whitespace-nowrap shrink-0"
+          className="text-sm sm:text-base font-semibold tracking-tight text-slate-100 whitespace-nowrap shrink-0"
         >
           SelfSteal Bash Architect
         </a>
 
         <nav
           aria-label="Основная навигация"
-          className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400"
+          className="hidden xl:flex items-center gap-4 text-[11px] font-semibold text-slate-400"
         >
+          <a
+            href="#simulator"
+            onClick={(e) => {
+              e.preventDefault();
+              setActiveTab('simulator');
+            }}
+            className={`hover:text-slate-100 transition-colors whitespace-nowrap shrink-0 ${
+              activeTab === 'simulator' ? 'text-emerald-400 underline underline-offset-4 font-semibold' : ''
+            }`}
+          >
+            SSH Деплой (1 клик)
+          </a>
           <a
             href="#bash"
             onClick={(e) => {
@@ -187,18 +198,6 @@ export default function App() {
             Директории и DNS
           </a>
           <a
-            href="#simulator"
-            onClick={(e) => {
-              e.preventDefault();
-              setActiveTab('simulator');
-            }}
-            className={`hover:text-slate-100 transition-colors whitespace-nowrap shrink-0 ${
-              activeTab === 'simulator' ? 'text-emerald-400 underline underline-offset-4 font-semibold' : ''
-            }`}
-          >
-            SSH Деплой (1 клик)
-          </a>
-          <a
             href="#readme"
             onClick={(e) => {
               e.preventDefault();
@@ -212,18 +211,18 @@ export default function App() {
           </a>
         </nav>
 
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab('simulator')}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             <span>🚀 Установить в 1 клик (SSH)</span>
           </button>
           <button
             type="button"
             onClick={() => handleCopyOneLiner('process')}
-            className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-950 bg-sky-400 hover:bg-sky-300 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-slate-950 bg-sky-400 hover:bg-sky-300 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             {oneLinerCopied === 'process' ? (
               <Check className="w-3.5 h-3.5" />
@@ -237,7 +236,7 @@ export default function App() {
           <button
             type="button"
             onClick={handleDownloadBashScript}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-200 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-slate-200 bg-[#13102a] hover:bg-slate-800 border border-slate-700 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span>.sh файл</span>
@@ -260,7 +259,7 @@ export default function App() {
               <span>{baseDir}</span>
             </div>
             <h1
-              className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-100"
+              className="text-2xl sm:text-3xl font-semibold tracking-tight text-slate-100"
               style={{ textWrap: 'balance' }}
             >
               Установщик SelfSteal для VLESS XHTTP и TCP Reality через Bash
@@ -272,7 +271,7 @@ export default function App() {
 
           {/* 4-Step Parameter Summary Strip */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="border border-slate-800 rounded-lg bg-slate-900/60 p-4">
+            <div className="border border-slate-800 rounded-lg bg-[#13102a] p-4">
               <div className="text-xs text-slate-400">1. Веб-сервер и директория</div>
               <div className="text-sm font-semibold font-mono text-slate-100 mt-1">
                 {config.webServer === 'caddy' ? 'Caddy' : 'Nginx'} · {baseDir}
@@ -282,7 +281,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="border border-slate-800 rounded-lg bg-slate-900/60 p-4">
+            <div className="border border-slate-800 rounded-lg bg-[#13102a] p-4">
               <div className="text-xs text-slate-400">2. Домен SelfSteal (SNI)</div>
               <div className="text-sm font-semibold font-mono text-sky-400 mt-1 truncate">
                 {config.domain || 'poland.example.xyz'}
@@ -292,7 +291,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="border border-slate-800 rounded-lg bg-slate-900/60 p-4">
+            <div className="border border-slate-800 rounded-lg bg-[#13102a] p-4">
               <div className="text-xs text-slate-400">3. Протокол и путь</div>
               <div className="text-sm font-semibold font-mono text-slate-100 mt-1 truncate">
                 {config.transport === 'xhttp'
@@ -306,7 +305,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="border border-slate-800 rounded-lg bg-slate-900/60 p-4">
+            <div className="border border-slate-800 rounded-lg bg-[#13102a] p-4">
               <div className="text-xs text-slate-400">4. Target (Dest порт)</div>
               <div className="text-sm font-semibold font-mono text-emerald-400 tabular-nums mt-1">
                 {fullTarget}
@@ -331,96 +330,101 @@ export default function App() {
           </div>
 
           <div className="lg:col-span-8 space-y-5">
-            {/* Segmented Control Tabs */}
+            {/* Segmented Control Tabs (SSH Deploy first) */}
             <div
               role="tablist"
               aria-label="Разделы генератора"
-              className="grid grid-cols-2 sm:grid-cols-6 gap-1.5 p-1.5 bg-slate-900 border border-slate-800 rounded-lg"
+              className="grid grid-cols-2 sm:grid-cols-6 gap-1.5 p-1.5 bg-[#13102a] border border-slate-800 rounded-lg"
             >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'simulator'}
+                onClick={() => setActiveTab('simulator')}
+                className={`px-2.5 py-2 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 truncate cursor-pointer ${
+                  activeTab === 'simulator'
+                    ? 'bg-emerald-400 text-slate-950 font-semibold'
+                    : 'text-slate-300 hover:text-white hover:bg-[#0d0a1a]'
+                }`}
+              >
+                1. SSH Деплой (1 клик)
+              </button>
               <button
                 type="button"
                 role="tab"
                 aria-selected={activeTab === 'bash'}
                 onClick={() => setActiveTab('bash')}
-                className={`px-2.5 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 truncate cursor-pointer ${
+                className={`px-2.5 py-2 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 truncate cursor-pointer ${
                   activeTab === 'bash'
                     ? 'bg-sky-500 text-slate-950 font-semibold'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                    : 'text-slate-300 hover:text-white hover:bg-[#0d0a1a]'
                 }`}
               >
-                1. Bash (.sh)
+                2. Bash (.sh)
               </button>
               <button
                 type="button"
                 role="tab"
                 aria-selected={activeTab === 'xray'}
                 onClick={() => setActiveTab('xray')}
-                className={`px-2.5 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 truncate cursor-pointer ${
+                className={`px-2.5 py-2 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 truncate cursor-pointer ${
                   activeTab === 'xray'
                     ? 'bg-sky-500 text-slate-950 font-semibold'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                    : 'text-slate-300 hover:text-white hover:bg-[#0d0a1a]'
                 }`}
               >
-                2. Xray &amp; Reality
+                3. Xray &amp; Reality
               </button>
               <button
                 type="button"
                 role="tab"
                 aria-selected={activeTab === 'webserver'}
                 onClick={() => setActiveTab('webserver')}
-                className={`px-2.5 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 truncate cursor-pointer ${
+                className={`px-2.5 py-2 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 truncate cursor-pointer ${
                   activeTab === 'webserver'
                     ? 'bg-sky-500 text-slate-950 font-semibold'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                    : 'text-slate-300 hover:text-white hover:bg-[#0d0a1a]'
                 }`}
               >
-                3. Docker {config.webServer === 'caddy' ? 'Caddy' : 'Nginx'} + SSL
+                4. Docker {config.webServer === 'caddy' ? 'Caddy' : 'Nginx'} + SSL
               </button>
               <button
                 type="button"
                 role="tab"
                 aria-selected={activeTab === 'directories'}
                 onClick={() => setActiveTab('directories')}
-                className={`px-2.5 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 truncate cursor-pointer ${
+                className={`px-2.5 py-2 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 truncate cursor-pointer ${
                   activeTab === 'directories'
                     ? 'bg-sky-500 text-slate-950 font-semibold'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                    : 'text-slate-300 hover:text-white hover:bg-[#0d0a1a]'
                 }`}
               >
-                4. {baseDir} &amp; DNS
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'simulator'}
-                onClick={() => setActiveTab('simulator')}
-                className={`px-2.5 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 truncate cursor-pointer ${
-                  activeTab === 'simulator'
-                    ? 'bg-emerald-400 text-slate-950 font-semibold'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                5. SSH Деплой &amp; Терминал
+                5. {baseDir} &amp; DNS
               </button>
               <button
                 type="button"
                 role="tab"
                 aria-selected={activeTab === 'readme'}
                 onClick={() => setActiveTab('readme')}
-                className={`px-2.5 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 truncate cursor-pointer ${
+                className={`px-2.5 py-2 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 truncate cursor-pointer ${
                   activeTab === 'readme'
                     ? 'bg-sky-500 text-slate-950 font-semibold'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                    : 'text-slate-300 hover:text-white hover:bg-[#0d0a1a]'
                 }`}
               >
                 6. README.md
               </button>
             </div>
 
-            {/* TAB 1: BASH INSTALL SCRIPT */}
+            {/* TAB 1: SSH DEPLOY */}
+            {activeTab === 'simulator' && (
+              <TerminalSimulator config={config} onChange={setConfig} />
+            )}
+
+            {/* TAB 2: BASH INSTALL SCRIPT */}
             {activeTab === 'bash' && (
               <div className="space-y-5">
-                <div className="border border-slate-800 rounded-lg bg-slate-900/70 p-4 space-y-3.5">
+                <div className="border border-slate-800 rounded-lg bg-[#13102a] p-4 space-y-3.5">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <div className="text-xs font-semibold text-slate-100">
@@ -440,7 +444,7 @@ export default function App() {
                         value={githubRepo}
                         onChange={(e) => setGithubRepo(e.target.value)}
                         placeholder="https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh"
-                        className="px-2.5 py-1 text-xs font-mono bg-slate-950 border border-slate-800 focus:border-sky-400 focus:outline-none rounded text-slate-100 w-full sm:w-80"
+                        className="px-2.5 py-1 text-xs font-mono bg-[#0d0a1a] border border-slate-800 focus:border-sky-400 focus:outline-none rounded text-slate-100 w-full sm:w-80"
                       />
                     </div>
                   </div>
@@ -452,7 +456,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => handleCopyOneLiner('process')}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-200 bg-[#0d0a1a] hover:bg-slate-800 border border-slate-700 rounded transition-colors cursor-pointer"
                       >
                         {oneLinerCopied === 'process' ? (
                           <Check className="w-3.5 h-3.5 text-emerald-400" />
@@ -462,7 +466,7 @@ export default function App() {
                         <span>{oneLinerCopied === 'process' ? 'Скопировано' : 'Копировать'}</span>
                       </button>
                     </div>
-                    <div className="p-2.5 rounded bg-slate-950 border border-slate-800 font-mono text-xs text-sky-300 select-all break-all">
+                    <div className="p-2.5 rounded bg-[#0d0a1a] border border-slate-800 font-mono text-xs text-sky-300 select-all break-all">
                       {bashProcessOneLiner}
                     </div>
                   </div>
@@ -474,7 +478,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => handleCopyOneLiner('pipe')}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-200 bg-[#0d0a1a] hover:bg-slate-800 border border-slate-700 rounded transition-colors cursor-pointer"
                       >
                         {oneLinerCopied === 'pipe' ? (
                           <Check className="w-3.5 h-3.5 text-emerald-400" />
@@ -484,7 +488,7 @@ export default function App() {
                         <span>{oneLinerCopied === 'pipe' ? 'Скопировано' : 'Копировать'}</span>
                       </button>
                     </div>
-                    <div className="p-2.5 rounded bg-slate-950 border border-slate-800 font-mono text-xs text-emerald-300 select-all break-all">
+                    <div className="p-2.5 rounded bg-[#0d0a1a] border border-slate-800 font-mono text-xs text-emerald-300 select-all break-all">
                       {bashPipeOneLiner}
                     </div>
                   </div>
@@ -500,14 +504,14 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB 2: XRAY CONFIG & REALITY SETTINGS */}
+            {/* TAB 3: XRAY CONFIG & REALITY SETTINGS */}
             {activeTab === 'xray' && (
               <div className="space-y-6">
-                {/* Таблица ключевых настроек Reality */}
-                <div className="border border-slate-800 rounded-lg bg-slate-900/70 overflow-hidden">
-                  <div className="px-4 py-3 border-b border-slate-800 bg-slate-900 flex items-center justify-between">
+                {/* Таблица ключевых настроек Reality для Remnawave */}
+                <div className="border border-slate-800 rounded-lg bg-[#13102a] overflow-hidden">
+                  <div className="px-4 py-3 border-b border-slate-800 bg-[#13102a] flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-slate-100">
-                      Параметры Reality для ввода в Xray / 3X-UI / Marzban
+                      Параметры Reality для Remnawave
                     </h3>
                     <span className="text-xs font-mono text-sky-400">
                       VLESS + {config.transport.toUpperCase()} + Reality
@@ -515,54 +519,33 @@ export default function App() {
                   </div>
                   <div className="divide-y divide-slate-800/70 text-xs">
                     <div className="grid grid-cols-1 sm:grid-cols-3 px-4 py-2.5 gap-2">
-                      <span className="text-slate-400">Target (Dest):</span>
-                      <span className="sm:col-span-2 font-mono text-emerald-400 select-all">
-                        {fullTarget}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 px-4 py-2.5 gap-2">
                       <span className="text-slate-400">ServerNames (SNI):</span>
                       <span className="sm:col-span-2 font-mono text-slate-100 select-all">
                         {config.domain}
                       </span>
                     </div>
-                    {config.transport === 'xhttp' ? (
-                      <>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 px-4 py-2.5 gap-2">
-                          <span className="text-slate-400">XHTTP Path (Путь чанков):</span>
-                          <span className="sm:col-span-2 font-mono text-sky-400 select-all">
-                            {normPath}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 px-4 py-2.5 gap-2">
-                          <span className="text-slate-400">Полный адрес XHTTP SelfSteal:</span>
-                          <span className="sm:col-span-2 font-mono text-slate-200 select-all">
-                            {config.domain}{normPath}
-                          </span>
-                        </div>
-                      </>
-                    ) : (
+                    {config.transport === 'xhttp' && (
                       <div className="grid grid-cols-1 sm:grid-cols-3 px-4 py-2.5 gap-2">
-                        <span className="text-slate-400">Flow (Поток TCP):</span>
+                        <span className="text-slate-400">XHTTP Path:</span>
                         <span className="sm:col-span-2 font-mono text-sky-400 select-all">
-                          xtls-rprx-vision
+                          {normPath}
                         </span>
                       </div>
                     )}
                     <div className="grid grid-cols-1 sm:grid-cols-3 px-4 py-2.5 gap-2">
-                      <span className="text-slate-400">Private Key (Сервер):</span>
+                      <span className="text-slate-400">Private Key:</span>
                       <span className="sm:col-span-2 font-mono text-amber-300 break-all select-all">
                         {config.privateKey}
                       </span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 px-4 py-2.5 gap-2">
-                      <span className="text-slate-400">Public Key (Клиент pbk):</span>
+                      <span className="text-slate-400">Public Key:</span>
                       <span className="sm:col-span-2 font-mono text-amber-300 break-all select-all">
                         {config.publicKey}
                       </span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 px-4 py-2.5 gap-2">
-                      <span className="text-slate-400">ShortIds (sid):</span>
+                      <span className="text-slate-400">ShortId:</span>
                       <span className="sm:col-span-2 font-mono text-slate-200 select-all">
                         {config.shortId}
                       </span>
@@ -573,14 +556,14 @@ export default function App() {
                 {/* Блок streamSettings для Xray */}
                 <CodeBlock
                   title="Что прописать в конфиг Xray (блок streamSettings)"
-                  subtitle={`streamSettings: network "${config.transport}" + security "reality" -> dest ${fullTarget}`}
+                  subtitle={`streamSettings: network "${config.transport}" + security "reality"`}
                   code={xrayConfig}
                   filename="xray-streamSettings.json"
                 />
               </div>
             )}
 
-            {/* TAB 3: DOCKER WEB SERVER (CADDY / NGINX) + SSL AUTO-RENEW & LOGS */}
+            {/* TAB 4: DOCKER WEB SERVER (CADDY / NGINX) + SSL AUTO-RENEW & LOGS */}
             {activeTab === 'webserver' && (
               <div className="space-y-6">
                 <CodeBlock
@@ -605,7 +588,7 @@ export default function App() {
                 <div className="grid grid-cols-1 gap-6">
                   <CodeBlock
                     title={`Скрипт автообновления Let's Encrypt (${baseDir}/ssl/renew-hook.sh)`}
-                    subtitle="Фоновый выпуск без лишнего лога в консоль и мягкая перезагрузка Docker-контейнера"
+                    subtitle="Фоновый выпуск и мягкая перезагрузка Docker-контейнера"
                     code={sslRenewScript}
                     filename="renew-hook.sh"
                     maxHeight="max-h-[320px]"
@@ -622,18 +605,13 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB 4: DIRECTORIES (/opt/ss-caddy or /opt/nginx) & DNS RECORDS */}
+            {/* TAB 5: DIRECTORIES (/opt/ss-caddy or /opt/nginx) & DNS RECORDS */}
             {activeTab === 'directories' && <DirectoryExplorer config={config} />}
-
-            {/* TAB 5: TERMINAL SIMULATOR */}
-            {activeTab === 'simulator' && (
-              <TerminalSimulator config={config} onChange={setConfig} />
-            )}
 
             {/* TAB 6: GITHUB README.MD */}
             {activeTab === 'readme' && (
               <div className="space-y-5">
-                <div className="border border-slate-800 rounded-lg bg-slate-900/60 p-4 space-y-1">
+                <div className="border border-slate-800 rounded-lg bg-[#13102a] p-4 space-y-1">
                   <div className="text-xs font-semibold text-slate-200">
                     Готовая документация README.md для вашего GitHub-репозитория
                   </div>
