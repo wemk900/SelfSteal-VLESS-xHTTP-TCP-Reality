@@ -1,13 +1,17 @@
-# 🔗 SelfSteal Management System — VLESS XHTTP Reality (Caddy)
+# 🔗 Docker SelfSteal Management System — VLESS XHTTP Reality (Caddy)
 
 **Author:** [t.me/wemkz](https://t.me/wemkz)
 
 ![OS](https://img.shields.io/badge/OS-Ubuntu%2020.04%2B%20%7C%20Debian%2011%2B-0ea5e9?style=flat-square)
+![Docker](https://img.shields.io/badge/Docker-caddy%3A2--alpine-2496ed?style=flat-square)
 ![Transport](https://img.shields.io/badge/VLESS-XHTTP%20Reality-10b981?style=flat-square)
-![WebServer](https://img.shields.io/badge/Server-Caddy-38bdf8?style=flat-square)
 ![Author](https://img.shields.io/badge/Author-t.me%2Fwemkz-8b5cf6?style=flat-square)
 
-Красивый цветной Bash-установщик **`install-selfsteal.sh`** с эмодзи-интерфейсом для развертывания маскировочного узла **SelfSteal** под **VLESS + XHTTP / TCP + Reality** с поддержкой **Caddy** (`/opt/ss-caddy`) и **Nginx** (`/opt/nginx`), **6 встроенными HTML-заглушками (с автоматическим случайным выбором)**, глобальной CLI-командой **`selfssteal`**, проверкой DNS через **`1.1.1.1` / `8.8.8.8` / `9.9.9.9`**, автообновлением сертификатов **Let's Encrypt** и ротацией логов.
+Цветной Bash-установщик **`install-selfsteal.sh`** для развертывания **Docker-контейнера SelfSteal** (**Caddy** `caddy:2-alpine` в `/opt/ss-caddy` или **Nginx** `nginx:stable-alpine` в `/opt/nginx`) под **VLESS + XHTTP / TCP + Reality**:
+- 🐳 **Полная контейнеризация (Docker Compose)**: если Docker и Docker Compose еще не установлены на сервере, скрипт **автоматически установит их сам в фоновом (скрытом) режиме**.
+- 🤫 **Чистый терминал без мусора**: весь процесс установки системных пакетов, Docker и выпуска сертификата Let's Encrypt выполняется в **скрытом режиме** (`>/dev/null 2>&1`) с аккуратными индикаторами выполнения.
+- 🎲 **6 встроенных HTML-заглушек**: автоматический случайный выбор (`RANDOM % 6`) при установке + мгновенная смена командой `selfssteal template`.
+- 🌐 **Автопроверка DNS**: сверка `A`-записи домена у `1.1.1.1`, `8.8.8.8` и `9.9.9.9`.
 
 ---
 
@@ -29,7 +33,7 @@ curl -fsSL "https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-
 
 ## 🎨 6 встроенных HTML-заглушек (Рандомный выбор при установке)
 
-Во время установки скрипт сохраняет все 6 реалистичных HTML-шаблонов в `/opt/ss-caddy/html/templates/` и **автоматически выбирает случайный шаблон (`RANDOM % 6`)** в `/opt/ss-caddy/html/index.html`. Вы также можете переключить шаблон в любой момент командой `selfssteal template`:
+Во время установки скрипт сохраняет все 6 реалистичных HTML-шаблонов в `/opt/ss-caddy/html/templates/` и **автоматически выбирает случайный шаблон (`RANDOM % 6`)** в `/opt/ss-caddy/html/index.html`. Переключить шаблон можно в любой момент командой `selfssteal template`:
 
 | № | Файл шаблона | Описание маскировочной страницы |
 | :--- | :--- | :--- |
@@ -48,62 +52,63 @@ curl -fsSL "https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-
 
 | Команда | Описание |
 | :--- | :--- |
-| `selfssteal start` | ▶️ Запустить сервис SelfSteal (caddy) и показать статус |
-| `selfssteal status` | 📊 Показать статус процесса, **Uptime сервера и процесса**, срок SSL, активный HTML-шаблон и пути к **SSL / HTML** |
+| `selfssteal start` | ▶️ Запустить Docker-контейнер SelfSteal (`selfsteal-caddy`) и показать статус |
+| `selfssteal status` | 📊 Показать статус контейнера, **Uptime сервера и контейнера**, срок SSL, активный HTML-шаблон и пути к **SSL / HTML** |
 | `selfssteal template` | 🎨 Выбрать один из 6 шаблонов заглушки (`1-speedtest.html` .. `6-gitpage.html`) или случайный |
 | `selfssteal menu` | 📋 Открыть интерактивное меню управления (опции 1–14) |
-| `selfssteal remove` | 🗑️ Полностью остановить и удалить SelfSteal, очистить Cron, директорию `/opt/ss-caddy` и symlink |
-| `selfssteal restart` | 🔄 Перезапустить веб-сервер без обрыва соединений |
+| `selfssteal remove` | 🗑️ Полностью остановить и удалить Docker-контейнер SelfSteal, очистить Cron, директорию `/opt/ss-caddy` и symlink |
+| `selfssteal restart` | 🔄 Перезапустить Docker-контейнер без потери конфигурации |
 | `selfssteal logs` | 📝 Открыть поток логов запросов (`/opt/ss-caddy/logs/access.log`) в реальном времени |
 
 ### Пример вывода `selfssteal status`:
 
 ```text
 root@vps:~# selfssteal status
-🔗 Caddy for Reality SelfSteal
-Management System v2.5.0
+🔗 Docker Caddy for Reality SelfSteal
+Management System v2.6.0 (Docker Compose)
 Project: VLESS XHTTP Reality | Author: t.me/wemkz
 ──────────────────────────────────────────
 
-✅ Status: Running (PID: 1842)
-   Server:          Caddy
-   Domain:          poland.example.xyz
-   Transport:       VLESS XHTTP Reality (poland.example.xyz/media/v3/chunk/)
-   Port:            9443 (Target: 127.0.0.1:9443)
-   Uptime сервера:  ⏱️  42 days, 11 hours, 28 minutes
-   Uptime процесса: ⚡ 14d 06:42:19 (с момента запуска: Sun 2026-10-18 05:12:00 UTC)
-   SSL:             ✅ Valid, 73 days left (Let's Encrypt)
-   Template:        🎨 🚀 1-speedtest.html (Спидтест с анимированным гейджем и цифрами)
+✅ Status: Running (Container: selfsteal-caddy, PID: 2418)
+   Server:             Docker Caddy (caddy:2-alpine)
+   Domain:             poland.example.xyz
+   Transport:          VLESS XHTTP Reality (poland.example.xyz/media/v3/chunk/)
+   Port:               9443 (Target: 127.0.0.1:9443)
+   Uptime сервера:     ⏱️  42 days, 11 hours, 28 minutes
+   Uptime контейнера:  🐳 14d 06:42:19 (запущен: 2026-10-18 05:12:00 UTC)
+   SSL:                ✅ Valid, 73 days left (Let's Encrypt)
+   Template:           🎨 🚀 1-speedtest.html (Спидтест с анимированным гейджем и цифрами)
 
 📂 Директории и пути (/opt/ss-caddy):
    ├─ 🔒 Путь к SSL:      /opt/ss-caddy/ssl (fullchain.pem, privkey.pem, renew-hook.sh)
    ├─ 🎨 Путь к HTML:     /opt/ss-caddy/html (index.html + 6 шаблонов в /templates)
+   ├─ 🐳 Docker Compose:  /opt/ss-caddy/docker-compose.yml
    ├─ ⚙️  Конфигурация:    /opt/ss-caddy/conf/Caddyfile
    ├─ 📝 Логи запросов:   /opt/ss-caddy/logs (access.log, error.log)
    └─ 🔗 Глобальный CLI:  /usr/local/bin/selfssteal -> /opt/ss-caddy/selfssteal.sh
 
 📋 Available Operations:
 
-🔧 Service Management:
-   1) 🚀 Reconfigure Caddy
-   2) ▶️  Start services          (selfssteal start)
-   3) ⏹️  Stop services
-   4) 🔄 Restart services        (selfssteal restart)
-   5) 📊 Service status & Uptime (selfssteal status)
+🔧 Docker Service Management:
+   1) 🚀 Reconfigure Docker Caddy
+   2) ▶️  Start container        (selfssteal start)
+   3) ⏹️  Stop container
+   4) 🔄 Restart container      (selfssteal restart)
+   5) 📊 Container status       (selfssteal status)
 
 🎨 Website Management:
-   6) 🎨 Website templates       (selfssteal template — Random 1-6)
+   6) 🎨 Website templates      (selfssteal template — Random 1-6)
    7) 📖 Setup guide & streamSettings
 
 📝 Logs & Monitoring:
-   8) 📝 View logs               (selfssteal logs)
+   8) 📝 View logs              (selfssteal logs)
    9) 📊 Log sizes
    10) 🧹 Clean logs
    11) ✏️  Edit configuration
    12) 🔒 Renew SSL certificate
 
 🗑️  Maintenance:
-   13) 🗑️  Uninstall Caddy      (selfssteal remove)
+   13) 🗑️  Uninstall selfsteal-caddy  (selfssteal remove)
    14) 🌐 Check DNS (1.1.1.1 / 8.8.8.8 / 9.9.9.9)
 
    0) ⬅️  Exit
@@ -118,6 +123,7 @@ Project: VLESS XHTTP Reality | Author: t.me/wemkz
 ```text
 /usr/local/bin/selfssteal ─────────► symlink на /opt/ss-caddy/selfssteal.sh
 /opt/ss-caddy/
+├── docker-compose.yml              # Docker Compose манифест (selfsteal-caddy, caddy:2-alpine, host network)
 ├── selfssteal.sh                   # Цветная CLI утилита управления (Author: t.me/wemkz)
 ├── conf/
 │   └── Caddyfile                  # Конфигурация Caddy (слушает 127.0.0.1:9443)
@@ -133,7 +139,7 @@ Project: VLESS XHTTP Reality | Author: t.me/wemkz
 ├── ssl/
 │   ├── fullchain.pem               # Сертификат Let's Encrypt (ECC P-256)
 │   ├── privkey.pem                 # Приватный ключ TLS (chmod 600)
-│   └── renew-hook.sh               # Скрипт автообновления по Cron (ежедневно в 03:15)
+│   └── renew-hook.sh               # Скрипт автообновления по Cron (перезагружает Docker-контейнер)
 └── logs/
     ├── access.log                  # Логи входящих запросов (JSON, ротация 14 дн.)
     └── error.log                   # Логи ошибок и предупреждений TLS

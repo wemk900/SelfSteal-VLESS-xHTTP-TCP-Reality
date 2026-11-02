@@ -6,6 +6,7 @@ import {
   normalizeTargetAddress,
   getBaseDirectory,
   validateConfig,
+  generateDockerComposeConfig,
   generateWebServerConfig,
   generateXrayConfig,
   generateBashInstallScript,
@@ -102,7 +103,16 @@ test('generateXrayConfig produces valid streamSettings JSON without UUID for XHT
   assert.equal(tcpJson.streamSettings.realitySettings.dest, '127.0.0.1:9443');
 });
 
-test('generateWebServerConfig and getDirectoryStructure include SSL, HTML, logs, CLI and config paths', () => {
+test('generateDockerComposeConfig, generateWebServerConfig and getDirectoryStructure include Docker, SSL, HTML, logs, CLI and config paths', () => {
+  const caddyCompose = generateDockerComposeConfig(sampleConfig);
+  assert.ok(caddyCompose.includes('image: caddy:2-alpine'));
+  assert.ok(caddyCompose.includes('container_name: selfsteal-caddy'));
+  assert.ok(caddyCompose.includes('network_mode: "host"'));
+
+  const nginxCompose = generateDockerComposeConfig({ ...sampleConfig, webServer: 'nginx' });
+  assert.ok(nginxCompose.includes('image: nginx:stable-alpine'));
+  assert.ok(nginxCompose.includes('container_name: selfsteal-nginx'));
+
   const caddyConf = generateWebServerConfig(sampleConfig);
   assert.ok(caddyConf.includes('/opt/ss-caddy/ssl/fullchain.pem'));
   assert.ok(caddyConf.includes('/opt/ss-caddy/logs/access.log'));
@@ -114,52 +124,52 @@ test('generateWebServerConfig and getDirectoryStructure include SSL, HTML, logs,
 
   const files = getDirectoryStructure(sampleConfig);
   assert.ok(files.some((f) => f.path === '/usr/local/bin/selfssteal'));
+  assert.ok(files.some((f) => f.path === '/opt/ss-caddy/docker-compose.yml'));
   assert.ok(files.some((f) => f.path === '/opt/ss-caddy/conf/Caddyfile'));
   assert.ok(files.some((f) => f.path === '/opt/ss-caddy/ssl/fullchain.pem'));
   assert.ok(files.some((f) => f.path === '/opt/ss-caddy/html/index.html'));
   assert.ok(files.some((f) => f.path === '/opt/ss-caddy/logs/access.log'));
 });
 
-test('generateBashInstallScript includes 4 sequential prompts, Author: t.me/wemkz, 6 HTML templates with RANDOM selection, DNS 1.1.1.1/8.8.8.8/9.9.9.9 check, and selfssteal CLI', () => {
+test('generateBashInstallScript includes Docker auto-install, hidden SSL/apt output, 4 sequential prompts, Author: t.me/wemkz, 6 HTML templates, and DNS check', () => {
   const script = generateBashInstallScript({ ...sampleConfig, camouflageTheme: 'random' });
   assert.ok(script.includes('Author: t.me/wemkz'));
-  assert.ok(script.includes('1) Выберите веб-сервер для SelfSteal:'));
+  assert.ok(script.includes('1) Выберите веб-сервер для SelfSteal (в Docker-контейнере):'));
   assert.ok(script.includes('2) Укажите ваш домен для SelfSteal'));
   assert.ok(script.includes('3) Выберите тип транспорта для VLESS Reality:'));
   assert.ok(script.includes('4) На каком адресе:порту будет работать Target'));
   assert.ok(script.includes('< /dev/tty'));
   assert.ok(script.includes('for RESOLVER in "1.1.1.1" "8.8.8.8" "9.9.9.9"; do'));
-  assert.ok(script.includes('Продолжить установку несмотря на несовпадение DNS? [y/N]:'));
+  assert.ok(script.includes('if ! command -v docker >/dev/null 2>&1; then'));
+  assert.ok(script.includes('curl -fsSL https://get.docker.com | sh >/dev/null 2>&1'));
+  assert.ok(script.includes('cat > "${BASE_DIR}/docker-compose.yml" <<EOF'));
+  assert.ok(script.includes('--standalone --keylength ec-256 --force >/dev/null 2>&1'));
   assert.ok(script.includes('1-speedtest.html'));
-  assert.ok(script.includes('2-cloud.html'));
-  assert.ok(script.includes('3-memes.html'));
-  assert.ok(script.includes('4-overloaded.html'));
-  assert.ok(script.includes('5-tech.html'));
   assert.ok(script.includes('6-gitpage.html'));
   assert.ok(script.includes('RANDOM %'));
   assert.ok(script.includes('ln -sf "${BASE_DIR}/selfssteal.sh" /usr/local/bin/selfssteal'));
 });
 
-test('generateSelfstealCliScript and generateCliCommandPreview support start, status (with Author: t.me/wemkz, Server Uptime, Process Status & SSL/HTML dirs), template, and remove', () => {
+test('generateSelfstealCliScript and generateCliCommandPreview support Docker container management, start, status, template, and remove', () => {
   const cliScript = generateSelfstealCliScript(sampleConfig);
   assert.ok(cliScript.includes('Author: t.me/wemkz'));
+  assert.ok(cliScript.includes('CONTAINER_NAME="selfsteal-caddy"'));
+  assert.ok(cliScript.includes('compose_cmd up -d'));
   assert.ok(cliScript.includes('cmd_start()'));
   assert.ok(cliScript.includes('cmd_status()'));
   assert.ok(cliScript.includes('cmd_template()'));
   assert.ok(cliScript.includes('cmd_remove()'));
-  assert.ok(cliScript.includes('get_server_uptime()'));
-  assert.ok(cliScript.includes('get_service_uptime()'));
 
   const statusPreview = generateCliCommandPreview(sampleConfig, 'status');
   assert.ok(statusPreview.includes('selfssteal status'));
   assert.ok(statusPreview.includes('Author: t.me/wemkz'));
-  assert.ok(statusPreview.includes('Status: Running'));
+  assert.ok(statusPreview.includes('Status: Running (Container: selfsteal-caddy'));
   assert.ok(statusPreview.includes('Uptime сервера:'));
   assert.ok(statusPreview.includes('/opt/ss-caddy/ssl'));
   assert.ok(statusPreview.includes('/opt/ss-caddy/html'));
 });
 
-test('generateGithubReadme includes one-liner bash <(curl ...), Author: t.me/wemkz, 6 HTML templates, DNS check, and selfssteal CLI', () => {
+test('generateGithubReadme includes one-liner bash <(curl ...), Docker Compose, Author: t.me/wemkz, 6 HTML templates, DNS check, and selfssteal CLI', () => {
   const readme = generateGithubReadme(sampleConfig);
   assert.ok(
     readme.includes(
@@ -167,11 +177,9 @@ test('generateGithubReadme includes one-liner bash <(curl ...), Author: t.me/wem
     )
   );
   assert.ok(readme.includes('t.me/wemkz'));
+  assert.ok(readme.includes('docker-compose.yml'));
   assert.ok(readme.includes('1-speedtest.html'));
   assert.ok(readme.includes('6-gitpage.html'));
   assert.ok(readme.includes('selfssteal status'));
-  assert.ok(readme.includes('1.1.1.1'));
-  assert.ok(readme.includes('8.8.8.8'));
-  assert.ok(readme.includes('9.9.9.9'));
 });
 

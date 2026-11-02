@@ -11,6 +11,7 @@ import {
   generateRealityCredentials,
   generateBashInstallScript,
   generateXrayConfig,
+  generateDockerComposeConfig,
   generateWebServerConfig,
   generateSslRenewalScript,
   generateLogrotateConfig,
@@ -66,6 +67,7 @@ export default function App() {
 
   const bashScript = useMemo(() => generateBashInstallScript(config), [config]);
   const xrayConfig = useMemo(() => generateXrayConfig(config), [config]);
+  const dockerComposeConfig = useMemo(() => generateDockerComposeConfig(config), [config]);
   const webServerConfig = useMemo(() => generateWebServerConfig(config), [config]);
   const sslRenewScript = useMemo(() => generateSslRenewalScript(config), [config]);
   const logrotateConfig = useMemo(() => generateLogrotateConfig(config), [config]);
@@ -185,6 +187,18 @@ export default function App() {
             Директории и DNS
           </a>
           <a
+            href="#simulator"
+            onClick={(e) => {
+              e.preventDefault();
+              setActiveTab('simulator');
+            }}
+            className={`hover:text-slate-100 transition-colors whitespace-nowrap shrink-0 ${
+              activeTab === 'simulator' ? 'text-emerald-400 underline underline-offset-4 font-semibold' : ''
+            }`}
+          >
+            SSH Деплой (1 клик)
+          </a>
+          <a
             href="#readme"
             onClick={(e) => {
               e.preventDefault();
@@ -201,8 +215,15 @@ export default function App() {
         <div className="flex items-center gap-2.5 shrink-0">
           <button
             type="button"
+            onClick={() => setActiveTab('simulator')}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <span>🚀 Установить в 1 клик (SSH)</span>
+          </button>
+          <button
+            type="button"
             onClick={() => handleCopyOneLiner('process')}
-            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-950 bg-sky-400 hover:bg-sky-300 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-950 bg-sky-400 hover:bg-sky-300 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             {oneLinerCopied === 'process' ? (
               <Check className="w-3.5 h-3.5" />
@@ -210,7 +231,7 @@ export default function App() {
               <Copy className="w-3.5 h-3.5" />
             )}
             <span>
-              {oneLinerCopied === 'process' ? 'Скопирована команда bash <(curl)' : 'Скопировать bash <(curl)'}
+              {oneLinerCopied === 'process' ? 'Скопировано' : 'bash <(curl)'}
             </span>
           </button>
           <button
@@ -353,7 +374,7 @@ export default function App() {
                     : 'text-slate-300 hover:text-white hover:bg-slate-800'
                 }`}
               >
-                3. {config.webServer === 'caddy' ? 'Caddy' : 'Nginx'} + SSL
+                3. Docker {config.webServer === 'caddy' ? 'Caddy' : 'Nginx'} + SSL
               </button>
               <button
                 type="button"
@@ -375,11 +396,11 @@ export default function App() {
                 onClick={() => setActiveTab('simulator')}
                 className={`px-2.5 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 truncate cursor-pointer ${
                   activeTab === 'simulator'
-                    ? 'bg-sky-500 text-slate-950 font-semibold'
+                    ? 'bg-emerald-400 text-slate-950 font-semibold'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800'
                 }`}
               >
-                5. Терминал
+                5. SSH Деплой &amp; Терминал
               </button>
               <button
                 type="button"
@@ -559,9 +580,19 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB 3: WEB SERVER (CADDY / NGINX) + SSL AUTO-RENEW & LOGS */}
+            {/* TAB 3: DOCKER WEB SERVER (CADDY / NGINX) + SSL AUTO-RENEW & LOGS */}
             {activeTab === 'webserver' && (
               <div className="space-y-6">
+                <CodeBlock
+                  title={`Docker Compose (${baseDir}/docker-compose.yml)`}
+                  subtitle={`Контейнер selfsteal-${config.webServer} (${
+                    config.webServer === 'caddy' ? 'caddy:2-alpine' : 'nginx:stable-alpine'
+                  }) · network_mode: host · автоустановка Docker если отсутствует`}
+                  code={dockerComposeConfig}
+                  filename="docker-compose.yml"
+                  maxHeight="max-h-[300px]"
+                />
+
                 <CodeBlock
                   title={`Конфигурация ${config.webServer === 'caddy' ? 'Caddy' : 'Nginx'} (${baseDir}/conf/${
                     config.webServer === 'caddy' ? 'Caddyfile' : 'nginx.conf'
@@ -574,7 +605,7 @@ export default function App() {
                 <div className="grid grid-cols-1 gap-6">
                   <CodeBlock
                     title={`Скрипт автообновления Let's Encrypt (${baseDir}/ssl/renew-hook.sh)`}
-                    subtitle="Автоматический выпуск, копирование сертификатов в /ssl и перезагрузка без обрыва соединений"
+                    subtitle="Фоновый выпуск без лишнего лога в консоль и мягкая перезагрузка Docker-контейнера"
                     code={sslRenewScript}
                     filename="renew-hook.sh"
                     maxHeight="max-h-[320px]"

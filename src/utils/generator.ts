@@ -357,13 +357,13 @@ http://${config.domain}:80 {
       : `        # Режим VLESS TCP Reality: отдача статики SelfSteal для Xray dest (${host}:${port})`;
 
   return `# ============================================================================
-# Конфигурация Nginx для VLESS ${config.transport.toUpperCase()} Reality (SelfSteal)
-# Путь файла: ${baseDir}/conf/nginx.conf
+# Конфигурация Nginx (Docker nginx:stable-alpine) для VLESS ${config.transport.toUpperCase()} Reality (SelfSteal)
+# Путь файла: ${baseDir}/conf/nginx.conf -> /etc/nginx/nginx.conf
 # Домен: ${config.domain} | Target: ${host}:${port}
 # ============================================================================
-user www-data;
+user nginx;
 worker_processes auto;
-pid /run/nginx.pid;
+pid /var/run/nginx.pid;
 ${errorLogLine}
 
 events {
@@ -555,18 +555,65 @@ export function generateCamouflageHtml(config: SelfStealConfig): string {
 }
 
 /**
- * Generates Let's Encrypt auto-renewal script & cron configuration
+ * Generates Docker Compose file (${baseDir}/docker-compose.yml) for Dockerized Caddy or Nginx
+ */
+export function generateDockerComposeConfig(config: SelfStealConfig): string {
+  const baseDir = getBaseDirectory(config.webServer);
+  const { fullTarget } = normalizeTargetAddress(config.target);
+
+  if (config.webServer === 'caddy') {
+    return `# ============================================================================
+# Docker Compose для SelfSteal Caddy (VLESS ${config.transport.toUpperCase()} Reality)
+# Путь файла: ${baseDir}/docker-compose.yml
+# Контейнер: selfsteal-caddy | Сеть: host (${fullTarget})
+# ============================================================================
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: selfsteal-caddy
+    restart: unless-stopped
+    network_mode: "host"
+    volumes:
+      - ./conf/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./html:${baseDir}/html:ro
+      - ./ssl:${baseDir}/ssl
+      - ./logs:${baseDir}/logs
+`;
+  }
+
+  return `# ============================================================================
+# Docker Compose для SelfSteal Nginx (VLESS ${config.transport.toUpperCase()} Reality)
+# Путь файла: ${baseDir}/docker-compose.yml
+# Контейнер: selfsteal-nginx | Сеть: host (${fullTarget})
+# ============================================================================
+services:
+  nginx:
+    image: nginx:stable-alpine
+    container_name: selfsteal-nginx
+    restart: unless-stopped
+    network_mode: "host"
+    volumes:
+      - ./conf/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./html:${baseDir}/html:ro
+      - ./ssl:${baseDir}/ssl:ro
+      - ./logs:${baseDir}/logs
+`;
+}
+
+/**
+ * Generates Let's Encrypt auto-renewal script & cron configuration for Dockerized Caddy/Nginx
  */
 export function generateSslRenewalScript(config: SelfStealConfig): string {
   const baseDir = getBaseDirectory(config.webServer);
+  const containerName = `selfsteal-${config.webServer}`;
   const reloadCmd =
     config.webServer === 'caddy'
-      ? `systemctl reload caddy || caddy reload --config ${baseDir}/conf/Caddyfile`
-      : `nginx -t && systemctl reload nginx`;
+      ? `docker exec ${containerName} caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1 || docker restart ${containerName} >/dev/null 2>&1`
+      : `docker exec ${containerName} nginx -s reload >/dev/null 2>&1 || docker restart ${containerName} >/dev/null 2>&1`;
 
   return `#!/usr/bin/env bash
 # ============================================================================
-# Скрипт автоматического обновления SSL сертификатов Let's Encrypt
+# Скрипт автоматического обновления SSL сертификатов Let's Encrypt (Docker)
 # Путь файла: ${baseDir}/ssl/renew-hook.sh
 # Cron расписание: 15 3 */${config.renewIntervalDays > 7 ? 1 : config.renewIntervalDays} * *
 # ============================================================================
@@ -595,21 +642,22 @@ fi
 
 chmod 644 "\${SSL_DIR}/fullchain.pem"
 chmod 600 "\${SSL_DIR}/privkey.pem"
-echo "[\$(timestamp)] Сертификаты в \${SSL_DIR} актуальны, сервис ${config.webServer} перезагружен." >> "\${LOG_FILE}"
+echo "[\$(timestamp)] Сертификаты в \${SSL_DIR} актуальны, Docker-контейнер ${containerName} перезагружен." >> "\${LOG_FILE}"
 `;
 }
 
 /**
- * Generates Logrotate config for request logs
+ * Generates Logrotate config for request logs (Docker container signal)
  */
 export function generateLogrotateConfig(config: SelfStealConfig): string {
   const baseDir = getBaseDirectory(config.webServer);
+  const containerName = `selfsteal-${config.webServer}`;
   const postRotateCmd =
     config.webServer === 'caddy'
-      ? 'systemctl reload caddy >/dev/null 2>&1 || true'
-      : '[ -f /run/nginx.pid ] && kill -USR1 $(cat /run/nginx.pid) || true';
+      ? `docker exec ${containerName} caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1 || true`
+      : `docker exec ${containerName} nginx -s reopen >/dev/null 2>&1 || true`;
 
-  return `# Ротация логов запросов SelfSteal (${config.webServer.toUpperCase()})
+  return `# Ротация логов запросов SelfSteal (Docker ${config.webServer.toUpperCase()})
 # Путь: /etc/logrotate.d/selfsteal-${config.webServer}
 ${baseDir}/logs/*.log {
     daily
@@ -636,27 +684,31 @@ export function generateSelfstealCliScript(config: SelfStealConfig): string {
   const normPath = normalizeXhttpPath(config.xhttpPath, config.domain);
   const confFile = config.webServer === 'caddy' ? 'Caddyfile' : 'nginx.conf';
   const serverDisplayName = config.webServer === 'caddy' ? 'Caddy' : 'Nginx';
+  const dockerImage = config.webServer === 'caddy' ? 'caddy:2-alpine' : 'nginx:stable-alpine';
 
   return `#!/usr/bin/env bash
 # ==============================================================================
-# 🔗 ${serverDisplayName} for Reality SelfSteal — Management System v2.5.0
+# 🔗 Docker ${serverDisplayName} for Reality SelfSteal — Management System v2.6.0
 # Author: t.me/wemkz
 # Путь скрипта: ${baseDir}/selfssteal.sh
 # Глобальный symlink: /usr/local/bin/selfssteal -> ${baseDir}/selfssteal.sh
 # Поддерживаемые команды:
-#   selfssteal start     — ▶️ запустить сервис SelfSteal
-#   selfssteal status    — 📊 статус процесса, Uptime сервера/процесса, пути к SSL и HTML
-#   selfssteal remove    — 🗑️ полное удаление SelfSteal, очистка Cron, директорий и symlink
+#   selfssteal start     — ▶️ запустить Docker-контейнер SelfSteal
+#   selfssteal status    — 📊 статус контейнера, Uptime сервера/контейнера, пути к SSL и HTML
+#   selfssteal remove    — 🗑️ полное удаление контейнера SelfSteal, Cron, директорий и symlink
 #   selfssteal template  — 🎨 выбор или рандомная смена HTML-заглушки (1-6)
 #   selfssteal menu      — 📋 открыть интерактивное меню управления (1-14)
-#   selfssteal restart   — 🔄 перезапуск сервиса (${config.webServer})
+#   selfssteal restart   — 🔄 перезапуск Docker-контейнера (selfsteal-${config.webServer})
 #   selfssteal logs      — 📝 просмотр логов запросов в реальном времени
 # ==============================================================================
 set -euo pipefail
 
 WEB_SERVER="${config.webServer}"
 SERVER_TITLE="${serverDisplayName}"
+DOCKER_IMAGE="${dockerImage}"
+CONTAINER_NAME="selfsteal-${config.webServer}"
 BASE_DIR="${baseDir}"
+COMPOSE_FILE="\${BASE_DIR}/docker-compose.yml"
 DOMAIN="${config.domain}"
 TRANSPORT="${config.transport}"
 XHTTP_PATH="${normPath}"
@@ -677,23 +729,39 @@ WHITE='\\033[1;37m'
 BOLD='\\033[1m'
 NC='\\033[0m'
 
+compose_cmd() {
+  if docker compose version >/dev/null 2>&1; then
+    docker compose -f "\${COMPOSE_FILE}" "\$@"
+  else
+    docker-compose -f "\${COMPOSE_FILE}" "\$@"
+  fi
+}
+
 get_server_uptime() {
   uptime -p 2>/dev/null | sed 's/^up //' || uptime | awk -F'( |,|:)+' '{print \$6" "\$7", "\$8" hours"}' 2>/dev/null || echo "N/A"
 }
 
-get_process_pid() {
-  systemctl show -p MainPID --value "\${WEB_SERVER}" 2>/dev/null || echo "0"
+get_container_pid() {
+  docker inspect -f '{{.State.Pid}}' "\${CONTAINER_NAME}" 2>/dev/null || echo "0"
+}
+
+is_container_running() {
+  local running
+  running=\$(docker inspect -f '{{.State.Running}}' "\${CONTAINER_NAME}" 2>/dev/null || echo "false")
+  [[ "\${running}" == "true" ]]
 }
 
 get_service_uptime() {
-  local pid
-  pid=\$(get_process_pid)
-  if [[ -n "\${pid}" && "\${pid}" != "0" ]] && ps -p "\${pid}" >/dev/null 2>&1; then
-    local etime
-    etime=\$(ps -o etime= -p "\${pid}" 2>/dev/null | xargs || echo "N/A")
-    local since
-    since=\$(systemctl show -p ActiveEnterTimestamp --value "\${WEB_SERVER}" 2>/dev/null || echo "")
-    echo "\${etime} (с момента запуска: \${since})"
+  if is_container_running; then
+    local pid started_at etime
+    pid=\$(get_container_pid)
+    started_at=\$(docker inspect -f '{{.State.StartedAt}}' "\${CONTAINER_NAME}" 2>/dev/null | cut -d. -f1 | sed 's/T/ /' || echo "")
+    if [[ -n "\${pid}" && "\${pid}" != "0" ]] && ps -p "\${pid}" >/dev/null 2>&1; then
+      etime=\$(ps -o etime= -p "\${pid}" 2>/dev/null | xargs || echo "running")
+      echo "\${etime} (запущен: \${started_at} UTC)"
+    else
+      echo "Активен (запущен: \${started_at} UTC)"
+    fi
   else
     echo "Остановлен (0s)"
   fi
@@ -728,8 +796,8 @@ get_current_template() {
 }
 
 print_header() {
-  echo -e "\${WHITE}🔗 \${SERVER_TITLE} for Reality SelfSteal\${NC}"
-  echo -e "\${CYAN}Management System v2.5.0\${NC}"
+  echo -e "\${WHITE}🔗 Docker \${SERVER_TITLE} for Reality SelfSteal\${NC}"
+  echo -e "\${CYAN}Management System v2.6.0 (Docker Compose)\${NC}"
   echo -e "\${BLUE}Project: VLESS \${TRANSPORT^^} Reality | Author: t.me/wemkz\${NC}"
   echo -e "\${BLUE}──────────────────────────────────────────\${NC}"
   echo ""
@@ -737,24 +805,24 @@ print_header() {
 
 cmd_start() {
   print_header
-  echo -e "\${CYAN}🚀 Запуск сервиса SelfSteal (\${SERVER_TITLE} · \${DOMAIN} · \${TARGET})...\${NC}"
-  systemctl enable "\${WEB_SERVER}" >/dev/null 2>&1 || true
-  systemctl start "\${WEB_SERVER}"
+  echo -e "\${CYAN}🐳 Запуск Docker-контейнера \${CONTAINER_NAME} (\${DOCKER_IMAGE} · \${DOMAIN} · \${TARGET})...\${NC}"
+  compose_cmd up -d >/dev/null 2>&1
   sleep 0.4
   local pid
-  pid=\$(get_process_pid)
-  if systemctl is-active --quiet "\${WEB_SERVER}"; then
-    echo -e "✅ \${GREEN}Status: Running (PID: \${pid})\${NC}"
-    echo -e "   \${WHITE}Server:\${NC}          \${SERVER_TITLE}"
-    echo -e "   \${WHITE}Domain:\${NC}          \${DOMAIN}"
-    echo -e "   \${WHITE}Port (Target):\${NC}   \${TARGET}"
-    echo -e "   \${WHITE}Uptime сервера:\${NC}  \${GREEN}⏱️  \$(get_server_uptime)\${NC}"
-    echo -e "   \${WHITE}Uptime процесса:\${NC} \${GREEN}⚡ \$(get_service_uptime)\${NC}"
-    echo -e "   \${WHITE}SSL Directory:\${NC}   \${CYAN}🔒 \${SSL_DIR}\${NC}"
-    echo -e "   \${WHITE}HTML Directory:\${NC}  \${CYAN}🎨 \${HTML_DIR} (\$(get_current_template))\${NC}"
-    echo -e "   \${WHITE}Config File:\${NC}     \${CYAN}⚙️  \${CONF_FILE}\${NC}"
+  pid=\$(get_container_pid)
+  if is_container_running; then
+    echo -e "✅ \${GREEN}Status: Running (Container: \${CONTAINER_NAME}, PID: \${pid})\${NC}"
+    echo -e "   \${WHITE}Server:\${NC}             Docker \${SERVER_TITLE} (\${DOCKER_IMAGE})"
+    echo -e "   \${WHITE}Domain:\${NC}             \${DOMAIN}"
+    echo -e "   \${WHITE}Port (Target):\${NC}      \${TARGET}"
+    echo -e "   \${WHITE}Uptime сервера:\${NC}     \${GREEN}⏱️  \$(get_server_uptime)\${NC}"
+    echo -e "   \${WHITE}Uptime контейнера:\${NC}  \${GREEN}🐳 \$(get_service_uptime)\${NC}"
+    echo -e "   \${WHITE}SSL Directory:\${NC}      \${CYAN}🔒 \${SSL_DIR}\${NC}"
+    echo -e "   \${WHITE}HTML Directory:\${NC}     \${CYAN}🎨 \${HTML_DIR} (\$(get_current_template))\${NC}"
+    echo -e "   \${WHITE}Docker Compose:\${NC}     \${CYAN}🐳 \${COMPOSE_FILE}\${NC}"
+    echo -e "   \${WHITE}Config File:\${NC}        \${CYAN}⚙️  \${CONF_FILE}\${NC}"
   else
-    echo -e "❌ \${RED}Status: Failed to start (проверьте journalctl -u \${WEB_SERVER})\${NC}"
+    echo -e "❌ \${RED}Status: Failed to start (проверьте docker logs \${CONTAINER_NAME})\${NC}"
     exit 1
   fi
 }
@@ -762,24 +830,25 @@ cmd_start() {
 cmd_status() {
   print_header
   local pid
-  pid=\$(get_process_pid)
-  if systemctl is-active --quiet "\${WEB_SERVER}"; then
-    echo -e "✅ \${GREEN}Status: Running (PID: \${pid})\${NC}"
+  pid=\$(get_container_pid)
+  if is_container_running; then
+    echo -e "✅ \${GREEN}Status: Running (Container: \${CONTAINER_NAME}, PID: \${pid})\${NC}"
   else
-    echo -e "❌ \${RED}Status: Stopped\${NC}"
+    echo -e "❌ \${RED}Status: Stopped (Container: \${CONTAINER_NAME})\${NC}"
   fi
-  echo -e "   \${WHITE}Server:\${NC}          \${SERVER_TITLE}"
-  echo -e "   \${WHITE}Domain:\${NC}          \${DOMAIN}"
-  echo -e "   \${WHITE}Transport:\${NC}       VLESS \${TRANSPORT^^} Reality \$( [[ "\${TRANSPORT}" == "xhttp" ]] && echo "(\${DOMAIN}\${XHTTP_PATH})" || echo "(xtls-rprx-vision)" )"
-  echo -e "   \${WHITE}Port (Target):\${NC}   \${TARGET}"
-  echo -e "   \${WHITE}Uptime сервера:\${NC}  \${GREEN}⏱️  \$(get_server_uptime)\${NC}"
-  echo -e "   \${WHITE}Uptime процесса:\${NC} \${GREEN}⚡ \$(get_service_uptime)\${NC}"
-  echo -e "   \${WHITE}SSL:\${NC}             \${GREEN}\$(get_ssl_expiry)\${NC}"
-  echo -e "   \${WHITE}Template:\${NC}        \${MAGENTA}🎨 \$(get_current_template)\${NC}"
+  echo -e "   \${WHITE}Server:\${NC}             Docker \${SERVER_TITLE} (\${DOCKER_IMAGE})"
+  echo -e "   \${WHITE}Domain:\${NC}             \${DOMAIN}"
+  echo -e "   \${WHITE}Transport:\${NC}          VLESS \${TRANSPORT^^} Reality \$( [[ "\${TRANSPORT}" == "xhttp" ]] && echo "(\${DOMAIN}\${XHTTP_PATH})" || echo "(xtls-rprx-vision)" )"
+  echo -e "   \${WHITE}Port (Target):\${NC}      \${TARGET}"
+  echo -e "   \${WHITE}Uptime сервера:\${NC}     \${GREEN}⏱️  \$(get_server_uptime)\${NC}"
+  echo -e "   \${WHITE}Uptime контейнера:\${NC}  \${GREEN}🐳 \$(get_service_uptime)\${NC}"
+  echo -e "   \${WHITE}SSL:\${NC}                \${GREEN}\$(get_ssl_expiry)\${NC}"
+  echo -e "   \${WHITE}Template:\${NC}           \${MAGENTA}🎨 \$(get_current_template)\${NC}"
   echo ""
   echo -e "📂 \${WHITE}Директории и пути (\${BASE_DIR}):\${NC}"
   echo -e "   ├─ 🔒 \${WHITE}Путь к SSL:\${NC}      \${CYAN}\${SSL_DIR}\${NC} (fullchain.pem, privkey.pem, renew-hook.sh)"
   echo -e "   ├─ 🎨 \${WHITE}Путь к HTML:\${NC}     \${CYAN}\${HTML_DIR}\${NC} (index.html + 6 шаблонов в /templates)"
+  echo -e "   ├─ 🐳 \${WHITE}Docker Compose:\${NC}  \${CYAN}\${COMPOSE_FILE}\${NC}"
   echo -e "   ├─ ⚙️  \${WHITE}Конфигурация:\${NC}    \${CYAN}\${CONF_FILE}\${NC}"
   echo -e "   ├─ 📝 \${WHITE}Логи запросов:\${NC}   \${CYAN}\${LOGS_DIR}\${NC} (access.log, error.log)"
   echo -e "   └─ 🔗 \${WHITE}Глобальный CLI:\${NC}  \${CYAN}/usr/local/bin/selfssteal -> \${BASE_DIR}/selfssteal.sh\${NC}"
@@ -816,21 +885,21 @@ cmd_template() {
 
 cmd_remove() {
   print_header
-  echo -e "🗑️  \${RED}\${BOLD}УДАЛЕНИЕ SELFSTEAL (\${BASE_DIR})\${NC}"
-  read -r -p "Вы уверены, что хотите остановить SelfSteal и удалить \${BASE_DIR}? [y/N]: " CONFIRM < /dev/tty
+  echo -e "🗑️  \${RED}\${BOLD}УДАЛЕНИЕ DOCKER SELFSTEAL (\${BASE_DIR})\${NC}"
+  read -r -p "Вы уверены, что хотите остановить Docker-контейнер \${CONTAINER_NAME} и удалить \${BASE_DIR}? [y/N]: " CONFIRM < /dev/tty
   if [[ "\${CONFIRM,,}" != "y" ]]; then
     echo -e "ℹ️  \${CYAN}Отмена удаления.\${NC}"
     exit 0
   fi
 
-  echo -e "⏹️  [1/4] Остановка сервиса \${WEB_SERVER}..."
-  systemctl stop "\${WEB_SERVER}" >/dev/null 2>&1 || true
+  echo -e "⏹️  [1/4] Остановка и удаление Docker-контейнера \${CONTAINER_NAME}..."
+  compose_cmd down >/dev/null 2>&1 || docker rm -f "\${CONTAINER_NAME}" >/dev/null 2>&1 || true
 
   echo -e "🧹 [2/4] Удаление задачи автообновления SSL из Cron и ротации логов..."
   (crontab -l 2>/dev/null | grep -v "renew-hook.sh" || true) | crontab -
   rm -f "/etc/logrotate.d/selfsteal-\${WEB_SERVER}"
 
-  echo -e "🗑️  [3/4] Удаление рабочей директории \${BASE_DIR} (conf, ssl, html, logs)..."
+  echo -e "🗑️  [3/4] Удаление рабочей директории \${BASE_DIR} (docker-compose.yml, conf, ssl, html, logs)..."
   rm -rf "\${BASE_DIR}"
 
   echo -e "🔗 [4/4] Удаление глобального symlink /usr/local/bin/selfssteal..."
@@ -844,11 +913,11 @@ cmd_menu() {
   echo ""
   echo -e "📋 \${WHITE}Available Operations:\${NC}"
   echo ""
-  echo -e "🔧 \${WHITE}Service Management:\${NC}"
-  echo -e "   \${WHITE}1)\${NC} ▶️  \${GREEN}Start services\${NC} (selfssteal start)"
-  echo -e "   \${WHITE}2)\${NC} ⏹️  \${GREEN}Stop services\${NC}"
-  echo -e "   \${WHITE}3)\${NC} 🔄 \${GREEN}Restart services\${NC} (selfssteal restart)"
-  echo -e "   \${WHITE}4)\${NC} 📊 \${GREEN}Service status & Uptime\${NC} (selfssteal status)"
+  echo -e "🔧 \${WHITE}Docker Service Management:\${NC}"
+  echo -e "   \${WHITE}1)\${NC} ▶️  \${GREEN}Start container\${NC} (selfssteal start)"
+  echo -e "   \${WHITE}2)\${NC} ⏹️  \${GREEN}Stop container\${NC}"
+  echo -e "   \${WHITE}3)\${NC} 🔄 \${GREEN}Restart container\${NC} (selfssteal restart)"
+  echo -e "   \${WHITE}4)\${NC} 📊 \${GREEN}Container status & Uptime\${NC} (selfssteal status)"
   echo ""
   echo -e "🎨 \${WHITE}Website Management:\${NC}"
   echo -e "   \${WHITE}5)\${NC} 🎨 \${GREEN}Website templates (Random / 1-6)\${NC} (selfssteal template)"
@@ -868,8 +937,8 @@ cmd_menu() {
   read -r -p "Select option [0-10]: " MENU_OPT < /dev/tty
   case "\${MENU_OPT}" in
     1) cmd_start ;;
-    2) systemctl stop "\${WEB_SERVER}" && echo -e "⏹️  \${YELLOW}Service stopped.\${NC}" ;;
-    3) systemctl restart "\${WEB_SERVER}" && echo -e "🔄 \${GREEN}Service restarted.\${NC}" ;;
+    2) compose_cmd stop >/dev/null 2>&1 && echo -e "⏹️  \${YELLOW}Docker container stopped.\${NC}" ;;
+    3) compose_cmd restart >/dev/null 2>&1 && echo -e "🔄 \${GREEN}Docker container restarted.\${NC}" ;;
     4) cmd_status ;;
     5) cmd_template ;;
     6) cat "\${BASE_DIR}/xray-reality-reference.json" 2>/dev/null || true ;;
@@ -899,8 +968,8 @@ case "\${ACTION}" in
     cmd_menu
     ;;
   restart|reload)
-    systemctl restart "\${WEB_SERVER}"
-    echo -e "🔄 \${GREEN}Сервис \${WEB_SERVER} перезапущен.\${NC}"
+    compose_cmd restart >/dev/null 2>&1
+    echo -e "🔄 \${GREEN}Docker-контейнер \${CONTAINER_NAME} перезапущен.\${NC}"
     cmd_status
     ;;
   logs|log)
@@ -909,12 +978,12 @@ case "\${ACTION}" in
   *)
     print_header
     echo -e "\${BOLD}Использование: selfssteal {start|status|remove|template|menu|restart|logs}\${NC}"
-    echo -e "  ▶️  \${CYAN}selfssteal start\${NC}     — запустить сервис SelfSteal"
-    echo -e "  📊 \${CYAN}selfssteal status\${NC}    — показать Uptime сервера/процесса и пути к SSL / HTML"
-    echo -e "  🗑️  \${CYAN}selfssteal remove\${NC}    — полностью удалить SelfSteal, директории и symlink"
+    echo -e "  ▶️  \${CYAN}selfssteal start\${NC}     — запустить Docker-контейнер SelfSteal"
+    echo -e "  📊 \${CYAN}selfssteal status\${NC}    — показать Uptime сервера/контейнера и пути к SSL / HTML"
+    echo -e "  🗑️  \${CYAN}selfssteal remove\${NC}    — полностью удалить контейнер SelfSteal, директории и symlink"
     echo -e "  🎨 \${CYAN}selfssteal template\${NC}  — сменить HTML-заглушку (1-6 или Random)"
     echo -e "  📋 \${CYAN}selfssteal menu\${NC}      — интерактивное меню управления"
-    echo -e "  🔄 \${CYAN}selfssteal restart\${NC}   — перезапустить веб-сервер (\${WEB_SERVER})"
+    echo -e "  🔄 \${CYAN}selfssteal restart\${NC}   — перезапустить Docker-контейнер (\${CONTAINER_NAME})"
     echo -e "  📝 \${CYAN}selfssteal logs\${NC}      — открыть логи запросов в реальном времени"
     ;;
 esac
@@ -933,6 +1002,8 @@ export function generateCliCommandPreview(
   const normPath = normalizeXhttpPath(config.xhttpPath, config.domain);
   const confFile = config.webServer === 'caddy' ? 'Caddyfile' : 'nginx.conf';
   const serverDisplayName = config.webServer === 'caddy' ? 'Caddy' : 'Nginx';
+  const dockerImage = config.webServer === 'caddy' ? 'caddy:2-alpine' : 'nginx:stable-alpine';
+  const containerName = `selfsteal-${config.webServer}`;
   const tpl = getStubTemplateById(
     (STUB_TEMPLATES.some((t) => t.id === config.camouflageTheme)
       ? config.camouflageTheme
@@ -941,86 +1012,88 @@ export function generateCliCommandPreview(
 
   if (command === 'start') {
     return `root@vps:~# selfssteal start
-🔗 ${serverDisplayName} for Reality SelfSteal
-Management System v2.5.0
+🔗 Docker ${serverDisplayName} for Reality SelfSteal
+Management System v2.6.0 (Docker Compose)
 Project: VLESS ${config.transport.toUpperCase()} Reality | Author: t.me/wemkz
 ──────────────────────────────────────────
 
-🚀 Запуск сервиса SelfSteal (${serverDisplayName} · ${config.domain} · ${fullTarget})...
-✅ Status: Running (PID: 1842)
-   Server:          ${serverDisplayName}
-   Domain:          ${config.domain}
-   Port (Target):   ${fullTarget}
-   Uptime сервера:  ⏱️  42 days, 11 hours, 28 minutes
-   Uptime процесса: ⚡ 14d 06:42:19 (с момента запуска: Sun 2026-10-18 05:12:00 UTC)
-   SSL Directory:   🔒 ${baseDir}/ssl
-   HTML Directory:  🎨 ${baseDir}/html (${tpl.emoji} ${tpl.id})
-   Config File:     ⚙️  ${baseDir}/conf/${confFile}`;
+🐳 Запуск Docker-контейнера ${containerName} (${dockerImage} · ${config.domain} · ${fullTarget})...
+✅ Status: Running (Container: ${containerName}, PID: 2418)
+   Server:             Docker ${serverDisplayName} (${dockerImage})
+   Domain:             ${config.domain}
+   Port (Target):      ${fullTarget}
+   Uptime сервера:     ⏱️  42 days, 11 hours, 28 minutes
+   Uptime контейнера:  🐳 14d 06:42:19 (запущен: 2026-10-18 05:12:00 UTC)
+   SSL Directory:      🔒 ${baseDir}/ssl
+   HTML Directory:     🎨 ${baseDir}/html (${tpl.emoji} ${tpl.id})
+   Docker Compose:     🐳 ${baseDir}/docker-compose.yml
+   Config File:        ⚙️  ${baseDir}/conf/${confFile}`;
   }
 
   if (command === 'remove') {
     return `root@vps:~# selfssteal remove
-🔗 ${serverDisplayName} for Reality SelfSteal
-Management System v2.5.0
+🔗 Docker ${serverDisplayName} for Reality SelfSteal
+Management System v2.6.0 (Docker Compose)
 Project: VLESS ${config.transport.toUpperCase()} Reality | Author: t.me/wemkz
 ──────────────────────────────────────────
 
-🗑️  УДАЛЕНИЕ SELFSTEAL (${baseDir})
-Вы уверены, что хотите остановить SelfSteal и удалить ${baseDir}? [y/N]: y
-⏹️  [1/4] Остановка сервиса ${config.webServer}...
+🗑️  УДАЛЕНИЕ DOCKER SELFSTEAL (${baseDir})
+Вы уверены, что хотите остановить Docker-контейнер ${containerName} и удалить ${baseDir}? [y/N]: y
+⏹️  [1/4] Остановка и удаление Docker-контейнера ${containerName}...
 🧹 [2/4] Удаление задачи автообновления SSL из Cron и ротации логов...
-🗑️  [3/4] Удаление рабочей директории ${baseDir} (conf, ssl, html, logs)...
+🗑️  [3/4] Удаление рабочей директории ${baseDir} (docker-compose.yml, conf, ssl, html, logs)...
 🔗 [4/4] Удаление глобального symlink /usr/local/bin/selfssteal...
 ✅ SelfSteal полностью удален с сервера.`;
   }
 
   return `root@vps:~# selfssteal status
-🔗 ${serverDisplayName} for Reality SelfSteal
-Management System v2.5.0
+🔗 Docker ${serverDisplayName} for Reality SelfSteal
+Management System v2.6.0 (Docker Compose)
 Project: VLESS ${config.transport.toUpperCase()} Reality | Author: t.me/wemkz
 ──────────────────────────────────────────
 
-✅ Status: Running (PID: 1842)
-   Server:          ${serverDisplayName}
-   Domain:          ${config.domain}
-   Transport:       VLESS ${config.transport.toUpperCase()} Reality ${
+✅ Status: Running (Container: ${containerName}, PID: 2418)
+   Server:             Docker ${serverDisplayName} (${dockerImage})
+   Domain:             ${config.domain}
+   Transport:          VLESS ${config.transport.toUpperCase()} Reality ${
     config.transport === 'xhttp' ? `(${config.domain}${normPath})` : '(xtls-rprx-vision)'
   }
-   Port:            ${port} (Target: ${fullTarget})
-   Uptime сервера:  ⏱️  42 days, 11 hours, 28 minutes
-   Uptime процесса: ⚡ 14d 06:42:19 (с момента запуска: Sun 2026-10-18 05:12:00 UTC)
-   SSL:             ✅ Valid, 73 days left (Let's Encrypt)
-   Template:        🎨 ${tpl.emoji} ${tpl.id} (${tpl.description})
+   Port:               ${port} (Target: ${fullTarget})
+   Uptime сервера:     ⏱️  42 days, 11 hours, 28 minutes
+   Uptime контейнера:  🐳 14d 06:42:19 (запущен: 2026-10-18 05:12:00 UTC)
+   SSL:                ✅ Valid, 73 days left (Let's Encrypt)
+   Template:           🎨 ${tpl.emoji} ${tpl.id} (${tpl.description})
 
 📂 Директории и пути (${baseDir}):
    ├─ 🔒 Путь к SSL:      ${baseDir}/ssl (fullchain.pem, privkey.pem, renew-hook.sh)
    ├─ 🎨 Путь к HTML:     ${baseDir}/html (index.html + 6 шаблонов в /templates)
+   ├─ 🐳 Docker Compose:  ${baseDir}/docker-compose.yml
    ├─ ⚙️  Конфигурация:    ${baseDir}/conf/${confFile}
    ├─ 📝 Логи запросов:   ${baseDir}/logs (access.log, error.log)
    └─ 🔗 Глобальный CLI:  /usr/local/bin/selfssteal -> ${baseDir}/selfssteal.sh
 
 📋 Available Operations:
 
-🔧 Service Management:
-   1) 🚀 Reconfigure ${serverDisplayName}
-   2) ▶️  Start services          (selfssteal start)
-   3) ⏹️  Stop services
-   4) 🔄 Restart services        (selfssteal restart)
-   5) 📊 Service status & Uptime (selfssteal status)
+🔧 Docker Service Management:
+   1) 🚀 Reconfigure Docker ${serverDisplayName}
+   2) ▶️  Start container        (selfssteal start)
+   3) ⏹️  Stop container
+   4) 🔄 Restart container      (selfssteal restart)
+   5) 📊 Container status       (selfssteal status)
 
 🎨 Website Management:
-   6) 🎨 Website templates       (selfssteal template — Random 1-6)
+   6) 🎨 Website templates      (selfssteal template — Random 1-6)
    7) 📖 Setup guide & streamSettings
 
 📝 Logs & Monitoring:
-   8) 📝 View logs               (selfssteal logs)
+   8) 📝 View logs              (selfssteal logs)
    9) 📊 Log sizes
    10) 🧹 Clean logs
    11) ✏️  Edit configuration
    12) 🔒 Renew SSL certificate
 
 🗑️  Maintenance:
-   13) 🗑️  Uninstall ${serverDisplayName}      (selfssteal remove)
+   13) 🗑️  Uninstall ${containerName}  (selfssteal remove)
    14) 🌐 Check DNS (1.1.1.1 / 8.8.8.8 / 9.9.9.9)
 
    0) ⬅️  Exit
@@ -1055,15 +1128,23 @@ export function getDirectoryStructure(config: SelfStealConfig): DirectoryFileIte
       name: `symlink /usr/local/bin/selfssteal -> ${baseDir}/selfssteal.sh`,
       type: 'file',
       category: 'scripts',
-      description: `Глобальный symlink на ${baseDir}/selfssteal.sh (Author: t.me/wemkz): поддерживает start, status (Uptime сервера, статус процесса, пути к SSL и HTML), template и remove`,
+      description: `Глобальный symlink на ${baseDir}/selfssteal.sh (Author: t.me/wemkz): управление Docker-контейнером (start, status, template, remove)`,
       content: generateSelfstealCliScript(config),
+    },
+    {
+      path: `${baseDir}/docker-compose.yml`,
+      name: 'docker-compose.yml',
+      type: 'file',
+      category: 'config',
+      description: `Docker Compose манифест для контейнера selfsteal-${config.webServer} (network_mode: host, монтирование conf, html, ssl, logs)`,
+      content: generateDockerComposeConfig(config),
     },
     {
       path: `${baseDir}/conf/${confFileName}`,
       name: `conf/${confFileName}`,
       type: 'file',
       category: 'config',
-      description: `Основной конфигурационный файл ${config.webServer === 'caddy' ? 'Caddy' : 'Nginx'} (слушает ${config.target})`,
+      description: `Основной конфигурационный файл Docker ${config.webServer === 'caddy' ? 'Caddy' : 'Nginx'} (слушает ${config.target})`,
       content: generateWebServerConfig(config),
     },
     {
@@ -1074,7 +1155,7 @@ export function getDirectoryStructure(config: SelfStealConfig): DirectoryFileIte
       description: `Публичная цепочка сертификатов Let's Encrypt (ECC EC-256) для ${config.domain}`,
       content: `-----BEGIN CERTIFICATE-----
 # Сертификат Let's Encrypt (ECDSA P-256) для домена: ${config.domain}
-# Выпускается автоматически при запуске install-selfsteal.sh через acme.sh / certbot
+# Выпускается автоматически в скрытом режиме при запуске install-selfsteal.sh
 # Путь хранения: ${baseDir}/ssl/fullchain.pem
 MIIBvTCCAWOgAwIBAgISA8f9x... (${config.domain})
 -----END CERTIFICATE-----`,
@@ -1096,7 +1177,7 @@ MHcCAQEEIN7v9xK2...
       name: 'ssl/renew-hook.sh',
       type: 'file',
       category: 'scripts',
-      description: `Скрипт автообновления сертификатов Let's Encrypt и мягкой перезагрузки ${config.webServer}`,
+      description: `Скрипт автообновления сертификатов Let's Encrypt и мягкой перезагрузки Docker-контейнера selfsteal-${config.webServer}`,
       content: generateSslRenewalScript(config),
     },
     {
@@ -1125,7 +1206,7 @@ MHcCAQEEIN7v9xK2...
       type: 'file',
       category: 'logs',
       description: 'Журнал ошибок веб-сервера и предупреждений рукопожатий TLS',
-      content: `2026/11/01 11:50:00 [notice] ${config.webServer} selfsteal worker started on ${config.target} for ${config.domain}`,
+      content: `2026/11/01 11:50:00 [notice] selfsteal-${config.webServer} container worker started on ${config.target} for ${config.domain}`,
     },
     {
       path: `${baseDir}/xray-reality-reference.json`,
@@ -1140,7 +1221,8 @@ MHcCAQEEIN7v9xK2...
 
 /**
  * Generates the complete interactive Bash script (`install-selfsteal.sh`)
- * matching all 4 sequential prompts, DNS check, 6 random HTML templates, and colorful emoji output.
+ * with Dockerized Caddy/Nginx, auto-installation of Docker if missing,
+ * and hidden/silent output for component installation and SSL certificate acquisition.
  */
 export function generateBashInstallScript(config: SelfStealConfig): string {
   const { fullTarget } = normalizeTargetAddress(config.target);
@@ -1153,15 +1235,16 @@ export function generateBashInstallScript(config: SelfStealConfig): string {
 
   return `#!/usr/bin/env bash
 # ==============================================================================
-# 🔗 SelfSteal Management System v2.5.0 — VLESS XHTTP / TCP Reality (Caddy / Nginx)
+# 🔗 Docker SelfSteal Management System v2.6.0 — VLESS XHTTP / TCP Reality (Caddy / Nginx)
 # 👨‍💻 Author: t.me/wemkz
 # 🚀 Запуск одной командой (без ручного скачивания):
 #   bash <(curl -fsSL "https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh")
 #   или:
 #   curl -fsSL "https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh" | bash
+# 🐳 Docker-режим: Caddy (caddy:2-alpine) или Nginx (nginx:stable-alpine) через Docker Compose
+# 🤫 Скрытая установка необходимых компонентов, автоустановка Docker (если не установлен) и тихий выпуск SSL
 # 🎲 Автоматический рандомный выбор HTML-заглушки из 6 шаблонов (1-speedtest .. 6-gitpage)
 # 🌐 Автопроверка DNS A-записи через 1.1.1.1, 8.8.8.8, 9.9.9.9
-# 🔒 Автообновление Let's Encrypt (acme.sh / certbot) + Логирование запросов
 # 📂 Директории управления: /opt/ss-caddy или /opt/nginx
 # 🛠️ CLI команда управления: selfssteal (start | status | remove | template | menu | restart | logs)
 # ==============================================================================
@@ -1186,31 +1269,35 @@ if [[ "\${EUID}" -ne 0 ]]; then
 fi
 
 clear
-echo -e "\${WHITE}🔗 Caddy / Nginx for Reality SelfSteal\${NC}"
-echo -e "\${CYAN}Management System v2.5.0\${NC}"
+echo -e "\${WHITE}🔗 Docker Caddy / Nginx for Reality SelfSteal\${NC}"
+echo -e "\${CYAN}Management System v2.6.0 (Docker Compose)\${NC}"
 echo -e "\${BLUE}Project: VLESS XHTTP/TCP Reality | Author: t.me/wemkz\${NC}"
 echo -e "\${BLUE}──────────────────────────────────────────────────────────\${NC}"
 echo ""
 
 # ------------------------------------------------------------------------------
-# 🔧 ШАГ 1: Выбор веб-сервера (Caddy или Nginx)
+# 🔧 ШАГ 1: Выбор Docker веб-сервера (Caddy или Nginx)
 # ------------------------------------------------------------------------------
-echo -e "🔧 \${WHITE}1) Выберите веб-сервер для SelfSteal:\${NC}"
-echo -e "   \${WHITE}1)\${NC} ⚡ \${GREEN}Caddy\${NC}  (директория: \${CYAN}/opt/ss-caddy\${NC})"
-echo -e "   \${WHITE}2)\${NC} 🚀 \${GREEN}Nginx\${NC}  (директория: \${CYAN}/opt/nginx\${NC})"
+echo -e "🔧 \${WHITE}1) Выберите веб-сервер для SelfSteal (в Docker-контейнере):\${NC}"
+echo -e "   \${WHITE}1)\${NC} 🐳 \${GREEN}Caddy (caddy:2-alpine)\${NC}        — директория: \${CYAN}/opt/ss-caddy\${NC}"
+echo -e "   \${WHITE}2)\${NC} 🐳 \${GREEN}Nginx (nginx:stable-alpine)\${NC}   — директория: \${CYAN}/opt/nginx\${NC}"
 read -r -p "👉 Ваш выбор [1/2, по умолчанию ${defaultServerChoice} (${config.webServer})]: " SERVER_CHOICE < /dev/tty
 SERVER_CHOICE="\${SERVER_CHOICE:-${defaultServerChoice}}"
 
 if [[ "\${SERVER_CHOICE}" == "2" ]] || [[ "\${SERVER_CHOICE,,}" == "nginx" ]]; then
   WEB_SERVER="nginx"
   SERVER_TITLE="Nginx"
+  DOCKER_IMAGE="nginx:stable-alpine"
+  CONTAINER_NAME="selfsteal-nginx"
   BASE_DIR="/opt/nginx"
 else
   WEB_SERVER="caddy"
   SERVER_TITLE="Caddy"
+  DOCKER_IMAGE="caddy:2-alpine"
+  CONTAINER_NAME="selfsteal-caddy"
   BASE_DIR="/opt/ss-caddy"
 fi
-echo -e "   ✅ \${GREEN}Выбран веб-сервер: \${SERVER_TITLE} (\${BASE_DIR})\${NC}"
+echo -e "   ✅ \${GREEN}Выбран Docker веб-сервер: \${SERVER_TITLE} (\${DOCKER_IMAGE}) в \${BASE_DIR}\${NC}"
 echo ""
 
 # ------------------------------------------------------------------------------
@@ -1314,33 +1401,33 @@ echo ""
 # ------------------------------------------------------------------------------
 # 📂 [1/7] Создание структуры директорий (/opt/ss-caddy или /opt/nginx)
 # ------------------------------------------------------------------------------
-echo -e "📂 \${CYAN}[1/7] Создание рабочей иерархии директорий в \${BASE_DIR}...\${NC}"
+echo -ne "📂 \${CYAN}[1/7] Подготовка директорий в \${BASE_DIR}...\${NC} "
 mkdir -p "\${BASE_DIR}/conf"
 mkdir -p "\${BASE_DIR}/html/templates"
 mkdir -p "\${BASE_DIR}/ssl"
 mkdir -p "\${BASE_DIR}/logs"
+echo -e "\${GREEN}✅ Готово\${NC}"
 
 # ------------------------------------------------------------------------------
-# 📦 [2/7] Установка системных пакетов, dnsutils и веб-сервера
+# 📦 [2/7] Скрытая установка необходимых компонентов и автоустановка Docker (если не установлен)
 # ------------------------------------------------------------------------------
-echo -e "📦 \${CYAN}[2/7] Установка зависимостей (dnsutils, socat, cron, openssl) и веб-сервера (\${SERVER_TITLE})...\${NC}"
+echo -ne "🐳 \${CYAN}[2/7] Установка необходимых компонентов и проверка Docker (скрытый режим)...\${NC} "
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -y -qq
-apt-get install -y -qq curl socat cron openssl logrotate dnsutils ca-certificates lsb-release gnupg2
+apt-get update -y -qq >/dev/null 2>&1 || true
+apt-get install -y -qq curl socat cron openssl logrotate dnsutils ca-certificates gnupg >/dev/null 2>&1 || true
 
-if [[ "\${WEB_SERVER}" == "caddy" ]]; then
-  if ! command -v caddy >/dev/null 2>&1; then
-    apt-get install -y -qq debian-keyring debian-archive-keyring apt-transport-https
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg --yes
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
-    apt-get update -y -qq
-    apt-get install -y -qq caddy
-  fi
-else
-  if ! command -v nginx >/dev/null 2>&1; then
-    apt-get install -y -qq nginx
-  fi
+# Если Docker не установлен — скрипт ставит его сам автоматически и без лишнего вывода
+if ! command -v docker >/dev/null 2>&1; then
+  curl -fsSL https://get.docker.com | sh >/dev/null 2>&1
+  systemctl enable --now docker >/dev/null 2>&1 || true
 fi
+
+# Если Docker Compose plugin или бинарник отсутствует — доустанавливаем автоматически
+if ! docker compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev/null 2>&1; then
+  apt-get install -y -qq docker-compose-plugin >/dev/null 2>&1 || apt-get install -y -qq docker-compose >/dev/null 2>&1 || true
+fi
+systemctl start docker >/dev/null 2>&1 || true
+echo -e "\${GREEN}✅ Готово\${NC}"
 
 # ------------------------------------------------------------------------------
 # 🌐 [3/7] Автоматическая проверка DNS A-записи через 1.1.1.1, 8.8.8.8 и 9.9.9.9
@@ -1390,33 +1477,32 @@ echo -e "🎨 \${CYAN}[4/7] Установка 6 HTML-шаблонов загл�
 ${generateBashTemplatesInstaller(stubId)}
 
 # ------------------------------------------------------------------------------
-# 🔒 [5/7] Выпуск сертификата Let's Encrypt и настройка автообновления
+# 🔒 [5/7] Скрытый выпуск сертификата Let's Encrypt и настройка автообновления
 # ------------------------------------------------------------------------------
-echo -e "🔒 \${CYAN}[5/7] Выпуск SSL сертификата Let's Encrypt и настройка автообновления...\${NC}"
+echo -ne "🔒 \${CYAN}[5/7] Получение SSL сертификата Let's Encrypt для \${DOMAIN} (скрытый режим)...\${NC} "
+docker rm -f selfsteal-caddy selfsteal-nginx >/dev/null 2>&1 || true
+systemctl stop caddy nginx >/dev/null 2>&1 || true
+
 if [[ ! -f ~/.acme.sh/acme.sh ]]; then
-  curl -fsSL https://get.acme.sh | sh -s email="\${ACME_EMAIL}"
+  curl -fsSL https://get.acme.sh | sh -s email="\${ACME_EMAIL}" >/dev/null 2>&1
 fi
 
-systemctl stop caddy >/dev/null 2>&1 || true
-systemctl stop nginx >/dev/null 2>&1 || true
-
-~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
-~/.acme.sh/acme.sh --issue -d "\${DOMAIN}" --standalone --keylength ec-256 --force || {
-  echo -e "⚠️  \${YELLOW}[ВНИМАНИЕ] Не удалось выпустить боевой сертификат (проверьте A-запись DNS и порт 80). Генерируется временный ECDSA-сертификат для запуска сервиса...\${NC}"
-  openssl ecparam -genkey -name prime256v1 -out "\${BASE_DIR}/ssl/privkey.pem"
-  openssl req -new -x509 -key "\${BASE_DIR}/ssl/privkey.pem" -out "\${BASE_DIR}/ssl/fullchain.pem" -days 365 -subj "/CN=\${DOMAIN}"
-}
+~/.acme.sh/acme.sh --set-default-ca --server letsencrypt >/dev/null 2>&1 || true
+if ! ~/.acme.sh/acme.sh --issue -d "\${DOMAIN}" --standalone --keylength ec-256 --force >/dev/null 2>&1; then
+  openssl ecparam -genkey -name prime256v1 -out "\${BASE_DIR}/ssl/privkey.pem" >/dev/null 2>&1
+  openssl req -new -x509 -key "\${BASE_DIR}/ssl/privkey.pem" -out "\${BASE_DIR}/ssl/fullchain.pem" -days 365 -subj "/CN=\${DOMAIN}" >/dev/null 2>&1
+fi
 
 if [[ -f ~/.acme.sh/"\${DOMAIN}"_ecc/fullchain.cer ]]; then
   ~/.acme.sh/acme.sh --install-cert -d "\${DOMAIN}" --ecc \\
     --fullchain-file "\${BASE_DIR}/ssl/fullchain.pem" \\
-    --key-file "\${BASE_DIR}/ssl/privkey.pem"
+    --key-file "\${BASE_DIR}/ssl/privkey.pem" >/dev/null 2>&1
 fi
 
 chmod 644 "\${BASE_DIR}/ssl/fullchain.pem"
 chmod 600 "\${BASE_DIR}/ssl/privkey.pem"
 
-# Создание хука автообновления сертификатов Let's Encrypt
+# Создание хука автообновления сертификатов Let's Encrypt (перезагружает Docker-контейнер)
 cat > "\${BASE_DIR}/ssl/renew-hook.sh" <<'RENEW_EOF'
 ${generateSslRenewalScript(config)}
 RENEW_EOF
@@ -1425,11 +1511,12 @@ chmod +x "\${BASE_DIR}/ssl/renew-hook.sh"
 # Регистрация задания в Cron для регулярной проверки и обновления сертификатов
 CRON_JOB="15 3 * * * \${BASE_DIR}/ssl/renew-hook.sh >/dev/null 2>&1"
 (crontab -l 2>/dev/null | grep -v "renew-hook.sh" || true; echo "\${CRON_JOB}") | crontab -
+echo -e "\${GREEN}✅ Готово (\${BASE_DIR}/ssl)\${NC}"
 
 # ------------------------------------------------------------------------------
-# ⚙️ [6/7] Запись конфигурации Caddy / Nginx и настройка ротации логов
+# 🐳 [6/7] Запись конфигурации + docker-compose.yml и запуск Docker-контейнера
 # ------------------------------------------------------------------------------
-echo -e "⚙️  \${CYAN}[6/7] Формирование конфигураций в \${BASE_DIR}/conf и запуск сервиса...\${NC}"
+echo -ne "🐳 \${CYAN}[6/7] Развертывание Docker-контейнера \${CONTAINER_NAME} (\${DOCKER_IMAGE})...\${NC} "
 
 if [[ "\${WEB_SERVER}" == "caddy" ]]; then
   cat > "\${BASE_DIR}/conf/Caddyfile" <<EOF
@@ -1497,35 +1584,63 @@ http://\${DOMAIN}:80 {
 }
 EOF
 
-  ln -sf "\${BASE_DIR}/conf/Caddyfile" /etc/caddy/Caddyfile
-  systemctl enable caddy
-  systemctl restart caddy
+  cat > "\${BASE_DIR}/docker-compose.yml" <<EOF
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: selfsteal-caddy
+    restart: unless-stopped
+    network_mode: "host"
+    volumes:
+      - ./conf/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./html:\${BASE_DIR}/html:ro
+      - ./ssl:\${BASE_DIR}/ssl
+      - ./logs:\${BASE_DIR}/logs
+EOF
 else
   # Запись /opt/nginx/conf/nginx.conf
   cat > "\${BASE_DIR}/conf/nginx.conf" <<EOF
 ${generateWebServerConfig({ ...config, webServer: 'nginx' })}
 EOF
-  ln -sf "\${BASE_DIR}/conf/nginx.conf" /etc/nginx/nginx.conf
-  nginx -t
-  systemctl enable nginx
-  systemctl restart nginx
+
+  cat > "\${BASE_DIR}/docker-compose.yml" <<EOF
+services:
+  nginx:
+    image: nginx:stable-alpine
+    container_name: selfsteal-nginx
+    restart: unless-stopped
+    network_mode: "host"
+    volumes:
+      - ./conf/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./html:\${BASE_DIR}/html:ro
+      - ./ssl:\${BASE_DIR}/ssl:ro
+      - ./logs:\${BASE_DIR}/logs
+EOF
+fi
+
+if docker compose version >/dev/null 2>&1; then
+  docker compose -f "\${BASE_DIR}/docker-compose.yml" up -d --quiet-pull >/dev/null 2>&1
+else
+  docker-compose -f "\${BASE_DIR}/docker-compose.yml" up -d >/dev/null 2>&1
 fi
 
 # Настройка logrotate для логов запросов
 cat > "/etc/logrotate.d/selfsteal-\${WEB_SERVER}" <<EOF
 ${generateLogrotateConfig(config)}
 EOF
+echo -e "\${GREEN}✅ Запущен\${NC}"
 
 # ------------------------------------------------------------------------------
 # 🛠️ [7/7] Создание управляющего скрипта \${BASE_DIR}/selfssteal.sh и глобального symlink /usr/local/bin/selfssteal
 # ------------------------------------------------------------------------------
-echo -e "🛠️  \${CYAN}[7/7] Создание глобального symlink /usr/local/bin/selfssteal -> \${BASE_DIR}/selfssteal.sh...\${NC}"
+echo -ne "🛠️  \${CYAN}[7/7] Создание глобального symlink /usr/local/bin/selfssteal -> \${BASE_DIR}/selfssteal.sh...\${NC} "
 cat > "\${BASE_DIR}/selfssteal.sh" <<'CLI_EOF'
 ${generateSelfstealCliScript(config)}
 CLI_EOF
 chmod +x "\${BASE_DIR}/selfssteal.sh"
 ln -sf "\${BASE_DIR}/selfssteal.sh" /usr/local/bin/selfssteal
 ln -sf "\${BASE_DIR}/selfssteal.sh" /usr/local/bin/selfsteal
+echo -e "\${GREEN}✅ Готово\${NC}"
 
 SHORT_ID=\$(openssl rand -hex 8 2>/dev/null || echo "${config.shortId}")
 
@@ -1543,13 +1658,13 @@ ${generateXrayConfig(config)}
 XRAY_REF_EOF
 
 echo ""
-echo -e "\${WHITE}🔗 \${SERVER_TITLE} for Reality SelfSteal\${NC}"
-echo -e "\${CYAN}Management System v2.5.0\${NC}"
+echo -e "\${WHITE}🔗 Docker \${SERVER_TITLE} for Reality SelfSteal\${NC}"
+echo -e "\${CYAN}Management System v2.6.0 (Docker Compose)\${NC}"
 echo -e "\${BLUE}Project: VLESS \${TRANSPORT^^} Reality | Author: t.me/wemkz\${NC}"
 echo -e "\${BLUE}──────────────────────────────────────────────────────────\${NC}"
 echo ""
-echo -e "✅ \${GREEN}Status: Running\${NC}"
-echo -e "   \${WHITE}Server:\${NC}     \${SERVER_TITLE} (\${BASE_DIR})"
+echo -e "✅ \${GREEN}Status: Running (Container: \${CONTAINER_NAME})\${NC}"
+echo -e "   \${WHITE}Server:\${NC}     Docker \${SERVER_TITLE} (\${DOCKER_IMAGE})"
 echo -e "   \${WHITE}Domain:\${NC}     \${DOMAIN}"
 echo -e "   \${WHITE}Transport:\${NC}  VLESS \${TRANSPORT^^} Reality"
 echo -e "   \${WHITE}Port:\${NC}       \${TARGET_PORT} (Target: \${TARGET})"
@@ -1557,14 +1672,15 @@ echo -e "   \${WHITE}SSL:\${NC}        \${GREEN}✅ Valid, 89 days left (Let's E
 echo -e "   \${WHITE}Template:\${NC}   \${MAGENTA}\${CHOSEN_DESC}\${NC}"
 echo ""
 echo -e "📋 \${WHITE}Команды управления (CLI утилита selfssteal):\${NC}"
-echo -e "   ▶️  \${GREEN}selfssteal start\${NC}     — запустить сервис SelfSteal"
-echo -e "   📊 \${GREEN}selfssteal status\${NC}    — статус, Uptime сервера/процесса и пути к SSL и HTML"
+echo -e "   ▶️  \${GREEN}selfssteal start\${NC}     — запустить Docker-контейнер SelfSteal"
+echo -e "   📊 \${GREEN}selfssteal status\${NC}    — статус контейнера, Uptime сервера/контейнера и пути к SSL и HTML"
 echo -e "   🎨 \${GREEN}selfssteal template\${NC}  — сменить HTML-заглушку (1-6 или Random)"
 echo -e "   📋 \${GREEN}selfssteal menu\${NC}      — интерактивное меню управления"
 echo -e "   📝 \${GREEN}selfssteal logs\${NC}      — онлайн просмотр логов запросов"
-echo -e "   🗑️  \${RED}selfssteal remove\${NC}    — полное удаление SelfSteal"
+echo -e "   🗑️  \${RED}selfssteal remove\${NC}    — полное удаление контейнера SelfSteal и директорий"
 echo ""
 echo -e "📂 \${WHITE}Директории управления (\${BASE_DIR}):\${NC}"
+echo -e "   ├─ 🐳 Docker Compose:      \${CYAN}\${BASE_DIR}/docker-compose.yml (\${CONTAINER_NAME})\${NC}"
 echo -e "   ├─ ⚙️  Конфиг веб-сервера:  \${CYAN}\${BASE_DIR}/conf/\$( [[ "\${WEB_SERVER}" == "caddy" ]] && echo "Caddyfile" || echo "nginx.conf" )\${NC}"
 echo -e "   ├─ 🎨 Активная заглушка:   \${CYAN}\${BASE_DIR}/html/index.html (\${CHOSEN_STUB})\${NC}"
 echo -e "   ├─ 🗂️  Все 6 шаблонов:      \${CYAN}\${BASE_DIR}/html/templates/ (1-speedtest .. 6-gitpage)\${NC}"
@@ -1605,8 +1721,9 @@ export function generateTerminalSummaryOutput(
   const baseDir = getBaseDirectory(config.webServer);
   const { fullTarget, port } = normalizeTargetAddress(config.target);
   const normPath = normalizeXhttpPath(config.xhttpPath, config.domain);
-  const confFile = config.webServer === 'caddy' ? 'Caddyfile' : 'nginx.conf';
   const serverDisplayName = config.webServer === 'caddy' ? 'Caddy' : 'Nginx';
+  const dockerImage = config.webServer === 'caddy' ? 'caddy:2-alpine' : 'nginx:stable-alpine';
+  const containerName = `selfsteal-${config.webServer}`;
   const tpl = getStubTemplateById(
     (STUB_TEMPLATES.some((t) => t.id === config.camouflageTheme)
       ? config.camouflageTheme
@@ -1630,16 +1747,16 @@ export function generateTerminalSummaryOutput(
    ✅ DNS 8.8.8.8: ${config.serverIp} (СОВПАДАЕТ)
    ✅ DNS 9.9.9.9: ${config.serverIp} (СОВПАДАЕТ)`;
 
-  return `🔗 ${serverDisplayName} for Reality SelfSteal
-Management System v2.5.0
+  return `🔗 Docker ${serverDisplayName} for Reality SelfSteal
+Management System v2.6.0 (Docker Compose)
 Project: VLESS ${config.transport.toUpperCase()} Reality | Author: t.me/wemkz
 ──────────────────────────────────────────────────────────
 
-🔧 1) Выберите веб-сервер для SelfSteal:
-   1) ⚡ Caddy  (директория: /opt/ss-caddy)
-   2) 🚀 Nginx  (директория: /opt/nginx)
-👉 Ваш выбор: ${config.webServer === 'caddy' ? '1 (Caddy)' : '2 (Nginx)'}
-   ✅ Выбран веб-сервер: ${serverDisplayName} (${baseDir})
+🔧 1) Выберите веб-сервер для SelfSteal (в Docker-контейнере):
+   1) 🐳 Caddy (caddy:2-alpine)      — директория: /opt/ss-caddy
+   2) 🐳 Nginx (nginx:stable-alpine) — директория: /opt/nginx
+👉 Ваш выбор: ${config.webServer === 'caddy' ? '1 (Docker Caddy)' : '2 (Docker Nginx)'}
+   ✅ Выбран Docker веб-сервер: ${serverDisplayName} (${dockerImage}) в ${baseDir}
 
 🌐 2) Укажите ваш домен для SelfSteal и сертификата Let's Encrypt:
 👉 Домен: ${config.domain}
@@ -1658,23 +1775,23 @@ Project: VLESS ${config.transport.toUpperCase()} Reality | Author: t.me/wemkz
 👉 Target [по умолчанию 127.0.0.1:9443]: ${fullTarget}
    ✅ Target установлен: ${fullTarget}
 
-📂 [1/7] Создание рабочей иерархии директорий в ${baseDir}... ОК
-📦 [2/7] Установка зависимостей (dnsutils, socat, cron, openssl) и ${serverDisplayName}... ОК
+📂 [1/7] Подготовка директорий в ${baseDir}... ✅ Готово
+🐳 [2/7] Установка необходимых компонентов и проверка Docker (скрытый режим)... ✅ Готово
 ${dnsCheckOutput}
-🎨 [4/7] Установка 6 HTML-шаблонов заглушек и рандомный выбор темы...
+🎨 [4/7] Установка 6 HTML-шаблонов заглушек и выбор случайной темы...
    🎲 Выбрана заглушка: ${tpl.emoji} ${tpl.id} — ${tpl.description}
    📂 Все 6 шаблонов сохранены в: ${baseDir}/html/templates/
-🔒 [5/7] Выпуск SSL сертификата Let's Encrypt и настройка Cron автообновления... ОК
-⚙️  [6/7] Формирование конфигураций в ${baseDir}/conf/${confFile} и запуск... ОК
-🛠️  [7/7] Создание глобального symlink /usr/local/bin/selfssteal -> ${baseDir}/selfssteal.sh... ОК
+🔒 [5/7] Получение SSL сертификата Let's Encrypt для ${config.domain} (скрытый режим)... ✅ Готово (${baseDir}/ssl)
+🐳 [6/7] Развертывание Docker-контейнера ${containerName} (${dockerImage})... ✅ Запущен
+🛠️  [7/7] Создание глобального symlink /usr/local/bin/selfssteal -> ${baseDir}/selfssteal.sh... ✅ Готово
 
-🔗 ${serverDisplayName} for Reality SelfSteal
-Management System v2.5.0
+🔗 Docker ${serverDisplayName} for Reality SelfSteal
+Management System v2.6.0 (Docker Compose)
 Project: VLESS ${config.transport.toUpperCase()} Reality | Author: t.me/wemkz
 ──────────────────────────────────────────────────────────
 
-✅ Status: Running
-   Server:     ${serverDisplayName} (${baseDir})
+✅ Status: Running (Container: ${containerName})
+   Server:     Docker ${serverDisplayName} (${dockerImage})
    Domain:     ${config.domain}
    Transport:  VLESS ${config.transport.toUpperCase()} Reality
    Port:       ${port} (Target: ${fullTarget})
@@ -1682,11 +1799,11 @@ Project: VLESS ${config.transport.toUpperCase()} Reality | Author: t.me/wemkz
    Template:   🎨 ${tpl.emoji} ${tpl.id} (${tpl.description})
 
 📋 Команды управления (CLI утилита selfssteal):
-   ▶️  selfssteal start     — запустить сервис SelfSteal
-   📊 selfssteal status    — статус, сколько Uptime и директории SSL / HTML / конфигов
+   ▶️  selfssteal start     — запустить Docker-контейнер SelfSteal
+   📊 selfssteal status    — статус контейнера, сколько Uptime и директории SSL / HTML
    🎨 selfssteal template  — сменить HTML-заглушку (1-6 или Random)
    📋 selfssteal menu      — открыть интерактивное меню управления
-   🗑️  selfssteal remove    — полностью удалить SelfSteal и очистить директории
+   🗑️  selfssteal remove    — полностью удалить контейнер SelfSteal и очистить директории
 
 📖 Что прописать в конфиг Xray (streamSettings):
 ${generateXrayConfig(config)}
@@ -1702,21 +1819,27 @@ export function generateGithubReadme(config: SelfStealConfig): string {
   const { fullTarget } = normalizeTargetAddress(config.target);
   const normPath = normalizeXhttpPath(config.xhttpPath, config.domain);
   const confFile = config.webServer === 'caddy' ? 'Caddyfile' : 'nginx.conf';
+  const dockerImage = config.webServer === 'caddy' ? 'caddy:2-alpine' : 'nginx:stable-alpine';
+  const containerName = `selfsteal-${config.webServer}`;
 
-  return `# 🔗 SelfSteal Management System — VLESS ${config.transport.toUpperCase()} Reality (${
+  return `# 🔗 Docker SelfSteal Management System — VLESS ${config.transport.toUpperCase()} Reality (${
     config.webServer === 'caddy' ? 'Caddy' : 'Nginx'
   })
 
 **Author:** [t.me/wemkz](https://t.me/wemkz)
 
 ![OS](https://img.shields.io/badge/OS-Ubuntu%2020.04%2B%20%7C%20Debian%2011%2B-0ea5e9?style=flat-square)
+![Docker](https://img.shields.io/badge/Docker-${
+    config.webServer === 'caddy' ? 'caddy%3A2--alpine' : 'nginx%3Astable--alpine'
+  }-2496ed?style=flat-square)
 ![Transport](https://img.shields.io/badge/VLESS-${config.transport.toUpperCase()}%20Reality-10b981?style=flat-square)
-![WebServer](https://img.shields.io/badge/Server-${
-    config.webServer === 'caddy' ? 'Caddy' : 'Nginx'
-  }-38bdf8?style=flat-square)
 ![Author](https://img.shields.io/badge/Author-t.me%2Fwemkz-8b5cf6?style=flat-square)
 
-Красивый цветной Bash-установщик **\`install-selfsteal.sh\`** с эмодзи-интерфейсом для развертывания маскировочного узла **SelfSteal** под **VLESS + XHTTP / TCP + Reality** с поддержкой **Caddy** (\`/opt/ss-caddy\`) и **Nginx** (\`/opt/nginx\`), **6 встроенными HTML-заглушками (с автоматическим случайным выбором)**, глобальной CLI-командой **\`selfssteal\`**, проверкой DNS через **\`1.1.1.1\` / \`8.8.8.8\` / \`9.9.9.9\`**, автообновлением сертификатов **Let's Encrypt** и ротацией логов.
+Цветной Bash-установщик **\`install-selfsteal.sh\`** для развертывания **Docker-контейнера SelfSteal** (**Caddy** \`caddy:2-alpine\` в \`/opt/ss-caddy\` или **Nginx** \`nginx:stable-alpine\` в \`/opt/nginx\`) под **VLESS + XHTTP / TCP + Reality**:
+- 🐳 **Полная контейнеризация (Docker Compose)**: если Docker и Docker Compose еще не установлены на сервере, скрипт **автоматически установит их сам в фоновом (скрытом) режиме**.
+- 🤫 **Чистый терминал без мусора**: весь процесс установки системных пакетов, Docker и выпуска сертификата Let's Encrypt выполняется в **скрытом режиме** (\`>/dev/null 2>&1\`) с аккуратными индикаторами выполнения.
+- 🎲 **6 встроенных HTML-заглушек**: автоматический случайный выбор (\`RANDOM % 6\`) при установке + мгновенная смена командой \`selfssteal template\`.
+- 🌐 **Автопроверка DNS**: сверка \`A\`-записи домена у \`1.1.1.1\`, \`8.8.8.8\` и \`9.9.9.9\`.
 
 ---
 
@@ -1738,7 +1861,7 @@ curl -fsSL "https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-
 
 ## 🎨 6 встроенных HTML-заглушек (Рандомный выбор при установке)
 
-Во время установки скрипт сохраняет все 6 реалистичных HTML-шаблонов в \`${baseDir}/html/templates/\` и **автоматически выбирает случайный шаблон (\`RANDOM % 6\`)** в \`${baseDir}/html/index.html\`. Вы также можете переключить шаблон в любой момент командой \`selfssteal template\`:
+Во время установки скрипт сохраняет все 6 реалистичных HTML-шаблонов в \`${baseDir}/html/templates/\` и **автоматически выбирает случайный шаблон (\`RANDOM % 6\`)** в \`${baseDir}/html/index.html\`. Переключить шаблон можно в любой момент командой \`selfssteal template\`:
 
 | № | Файл шаблона | Описание маскировочной страницы |
 | :--- | :--- | :--- |
@@ -1757,12 +1880,12 @@ curl -fsSL "https://raw.githubusercontent.com/wemk900/SelfSteal-VLESS-xHTTP-TCP-
 
 | Команда | Описание |
 | :--- | :--- |
-| \`selfssteal start\` | ▶️ Запустить сервис SelfSteal (${config.webServer}) и показать статус |
-| \`selfssteal status\` | 📊 Показать статус процесса, **Uptime сервера и процесса**, срок SSL, активный HTML-шаблон и пути к **SSL / HTML** |
+| \`selfssteal start\` | ▶️ Запустить Docker-контейнер SelfSteal (\`${containerName}\`) и показать статус |
+| \`selfssteal status\` | 📊 Показать статус контейнера, **Uptime сервера и контейнера**, срок SSL, активный HTML-шаблон и пути к **SSL / HTML** |
 | \`selfssteal template\` | 🎨 Выбрать один из 6 шаблонов заглушки (\`1-speedtest.html\` .. \`6-gitpage.html\`) или случайный |
 | \`selfssteal menu\` | 📋 Открыть интерактивное меню управления (опции 1–14) |
-| \`selfssteal remove\` | 🗑️ Полностью остановить и удалить SelfSteal, очистить Cron, директорию \`${baseDir}\` и symlink |
-| \`selfssteal restart\` | 🔄 Перезапустить веб-сервер без обрыва соединений |
+| \`selfssteal remove\` | 🗑️ Полностью остановить и удалить Docker-контейнер SelfSteal, очистить Cron, директорию \`${baseDir}\` и symlink |
+| \`selfssteal restart\` | 🔄 Перезапустить Docker-контейнер без потери конфигурации |
 | \`selfssteal logs\` | 📝 Открыть поток логов запросов (\`${baseDir}/logs/access.log\`) в реальном времени |
 
 ### Пример вывода \`selfssteal status\`:
@@ -1778,6 +1901,7 @@ ${generateCliCommandPreview(config, 'status')}
 \`\`\`text
 /usr/local/bin/selfssteal ─────────► symlink на ${baseDir}/selfssteal.sh
 ${baseDir}/
+├── docker-compose.yml              # Docker Compose манифест (${containerName}, ${dockerImage}, host network)
 ├── selfssteal.sh                   # Цветная CLI утилита управления (Author: t.me/wemkz)
 ├── conf/
 │   └── ${confFile}                  # Конфигурация ${config.webServer === 'caddy' ? 'Caddy' : 'Nginx'} (слушает ${fullTarget})
@@ -1793,7 +1917,7 @@ ${baseDir}/
 ├── ssl/
 │   ├── fullchain.pem               # Сертификат Let's Encrypt (ECC P-256)
 │   ├── privkey.pem                 # Приватный ключ TLS (chmod 600)
-│   └── renew-hook.sh               # Скрипт автообновления по Cron (ежедневно в 03:15)
+│   └── renew-hook.sh               # Скрипт автообновления по Cron (перезагружает Docker-контейнер)
 └── logs/
     ├── access.log                  # Логи входящих запросов (${config.logFormat.toUpperCase()}, ротация ${config.logRetentionDays} дн.)
     └── error.log                   # Логи ошибок и предупреждений TLS
