@@ -224,42 +224,6 @@ export default function App() {
           >
             Xray Reality
           </a>
-          <a
-            href="#webserver"
-            onClick={(e) => {
-              e.preventDefault();
-              setActiveTab('webserver');
-            }}
-            className={`hover:text-slate-100 transition-colors whitespace-nowrap shrink-0 ${
-              activeTab === 'webserver' ? 'text-sky-400 underline underline-offset-4' : ''
-            }`}
-          >
-            Сервер и SSL
-          </a>
-          <a
-            href="#directories"
-            onClick={(e) => {
-              e.preventDefault();
-              setActiveTab('directories');
-            }}
-            className={`hover:text-slate-100 transition-colors whitespace-nowrap shrink-0 ${
-              activeTab === 'directories' ? 'text-sky-400 underline underline-offset-4' : ''
-            }`}
-          >
-            Директории и DNS
-          </a>
-          <a
-            href="#readme"
-            onClick={(e) => {
-              e.preventDefault();
-              setActiveTab('readme');
-            }}
-            className={`hover:text-slate-100 transition-colors whitespace-nowrap shrink-0 ${
-              activeTab === 'readme' ? 'text-sky-400 underline underline-offset-4' : ''
-            }`}
-          >
-            README.md
-          </a>
         </nav>
 
         <div className="flex items-center gap-2 shrink-0">
@@ -385,7 +349,7 @@ export default function App() {
             <div
               role="tablist"
               aria-label="Разделы генератора"
-              className="grid grid-cols-2 sm:grid-cols-6 gap-1.5 p-1.5 bg-[#13102a] border border-slate-800 rounded-lg"
+              className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 p-1.5 bg-[#13102a] border border-slate-800 rounded-lg"
             >
               <button
                 type="button"
@@ -425,45 +389,6 @@ export default function App() {
                 }`}
               >
                 3. Xray &amp; Reality
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'webserver'}
-                onClick={() => setActiveTab('webserver')}
-                className={`px-2.5 py-2 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 truncate cursor-pointer ${
-                  activeTab === 'webserver'
-                    ? 'bg-sky-500 text-slate-950 font-semibold'
-                    : 'text-slate-300 hover:text-white hover:bg-[#0d0a1a]'
-                }`}
-              >
-                4. Docker {config.webServer === 'caddy' ? 'Caddy' : 'Nginx'} + SSL
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'directories'}
-                onClick={() => setActiveTab('directories')}
-                className={`px-2.5 py-2 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 truncate cursor-pointer ${
-                  activeTab === 'directories'
-                    ? 'bg-sky-500 text-slate-950 font-semibold'
-                    : 'text-slate-300 hover:text-white hover:bg-[#0d0a1a]'
-                }`}
-              >
-                5. {baseDir} &amp; DNS
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'readme'}
-                onClick={() => setActiveTab('readme')}
-                className={`px-2.5 py-2 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 truncate cursor-pointer ${
-                  activeTab === 'readme'
-                    ? 'bg-sky-500 text-slate-950 font-semibold'
-                    : 'text-slate-300 hover:text-white hover:bg-[#0d0a1a]'
-                }`}
-              >
-                6. README.md
               </button>
             </div>
 
