@@ -5,6 +5,7 @@ import {
   normalizeTargetAddress,
   normalizeXhttpPath,
   generateXrayConfig,
+  parseXrayCheckStdout,
 } from './generator';
 
 test('normalizeTargetAddress handles bare port and host:port', () => {
@@ -50,4 +51,23 @@ test('normalizeIncomingDeployConfig populates defaults for wizard payload', () =
   assert.equal(xrayJson.streamSettings.network, 'xhttp');
   assert.equal(xrayJson.streamSettings.realitySettings.serverNames[0], 'node.example.com');
   assert.equal(xrayJson.streamSettings.xhttpSettings.path, '/custom/chunk/');
+});
+
+test('parseXrayCheckStdout detects folder, docker image, or absence', () => {
+  assert.deepEqual(parseXrayCheckStdout('XRAY_CHECK:folder\n'), {
+    xray: true,
+    method: 'folder',
+  });
+  assert.deepEqual(parseXrayCheckStdout('XRAY_CHECK:docker\n'), {
+    xray: true,
+    method: 'docker',
+  });
+  assert.deepEqual(parseXrayCheckStdout('ghcr.io/remnawave/node:latest\n'), {
+    xray: true,
+    method: 'docker',
+  });
+  assert.deepEqual(parseXrayCheckStdout('XRAY_CHECK:none\n'), {
+    xray: false,
+    method: null,
+  });
 });

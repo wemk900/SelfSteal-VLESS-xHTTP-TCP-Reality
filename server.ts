@@ -18,6 +18,7 @@ import {
   generateXrayConfig,
   generateVlessClientUri,
   normalizeIncomingDeployConfig,
+  parseXrayCheckStdout,
   type StubTemplateId,
 } from './src/utils/generator';
 
@@ -50,6 +51,11 @@ export type DeploySseEvent =
       text: string;
     }
   | {
+      type: 'xray_check';
+      xray: boolean;
+      method: 'folder' | 'docker' | null;
+    }
+  | {
       type: 'complete';
       ok: boolean;
       vlessUri: string;
@@ -61,74 +67,49 @@ export type DeploySseEvent =
     };
 
 export interface SiteStatsSummary {
-  deploysDay: number;
-  deploysMonth: number;
-  deploysYear: number;
-  deploysTotal: number;
-  visitsDay: number;
-  visitsMonth: number;
-  visitsYear: number;
-  visitsTotal: number;
+  visitors: number;
 }
 
 interface StoredStatsData {
-  deploysTotal: number;
-  visitsTotal: number;
-  deploysByDay: Record<string, number>;
-  deploysByMonth: Record<string, number>;
-  deploysByYear: Record<string, number>;
-  visitsByDay: Record<string, number>;
-  visitsByMonth: Record<string, number>;
-  visitsByYear: Record<string, number>;
+  visitors: number;
+  deploysTotal?: number;
 }
 
-const STATS_FILE_PATH = path.join(process.cwd(), 'stats.json');
-
-function getDateKeys(now = new Date()) {
-  const yyyy = String(now.getUTCFullYear());
-  const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(now.getUTCDate()).padStart(2, '0');
-  return {
-    dayKey: `${yyyy}-${mm}-${dd}`,
-    monthKey: `${yyyy}-${mm}`,
-    yearKey: yyyy,
-  };
-}
+const PRIMARY_STATS_FILE_PATH = '/opt/selfsteal-ui/data/stats.json';
+const FALLBACK_STATS_FILE_PATH = path.join(process.cwd(), 'data', 'stats.json');
 
 function loadStoredStats(): StoredStatsData {
-  try {
-    if (fs.existsSync(STATS_FILE_PATH)) {
-      const raw = fs.readFileSync(STATS_FILE_PATH, 'utf-8');
-      const parsed = JSON.parse(raw) as Partial<StoredStatsData>;
-      return {
-        deploysTotal: Number(parsed.deploysTotal) || 0,
-        visitsTotal: Number(parsed.visitsTotal) || 0,
-        deploysByDay: parsed.deploysByDay || {},
-        deploysByMonth: parsed.deploysByMonth || {},
-        deploysByYear: parsed.deploysByYear || {},
-        visitsByDay: parsed.visitsByDay || {},
-        visitsByMonth: parsed.visitsByMonth || {},
-        visitsByYear: parsed.visitsByYear || {},
-      };
+  const candidates = [PRIMARY_STATS_FILE_PATH, FALLBACK_STATS_FILE_PATH];
+  for (const filePath of candidates) {
+    try {
+      if (fs.existsSync(filePath)) {
+        const raw = fs.readFileSync(filePath, 'utf-8');
+        const parsed = JSON.parse(raw) as { visitors?: number; visitsTotal?: number; deploysTotal?: number };
+        const visitors = Number(parsed.visitors ?? parsed.visitsTotal) || 0;
+        return {
+          visitors,
+          deploysTotal: Number(parsed.deploysTotal) || 0,
+        };
+      }
+    } catch {
+      // Try next candidate
     }
-  } catch {
-    // Fallback to empty stats if corrupted
   }
-  return {
-    deploysTotal: 0,
-    visitsTotal: 0,
-    deploysByDay: {},
-    deploysByMonth: {},
-    deploysByYear: {},
-    visitsByDay: {},
-    visitsByMonth: {},
-    visitsByYear: {},
-  };
+  return { visitors: 0, deploysTotal: 0 };
 }
 
 function saveStoredStats(data: StoredStatsData): void {
+  const payload = JSON.stringify({ visitors: data.visitors }, null, 2);
   try {
-    fs.writeFileSync(STATS_FILE_PATH, JSON.stringify(data, null, 2), 'utf-8');
+    fs.mkdirSync(path.dirname(PRIMARY_STATS_FILE_PATH), { recursive: true });
+    fs.writeFileSync(PRIMARY_STATS_FILE_PATH, payload, 'utf-8');
+    return;
+  } catch {
+    // Fallback to project directory if /opt is read-only
+  }
+  try {
+    fs.mkdirSync(path.dirname(FALLBACK_STATS_FILE_PATH), { recursive: true });
+    fs.writeFileSync(FALLBACK_STATS_FILE_PATH, payload, 'utf-8');
   } catch {
     // Ignore write errors in read-only environments
   }
@@ -136,46 +117,28 @@ function saveStoredStats(data: StoredStatsData): void {
 
 let statsStore: StoredStatsData = loadStoredStats();
 
-function getStatsSummary(): SiteStatsSummary {
-  const { dayKey, monthKey, yearKey } = getDateKeys();
-  return {
-    deploysDay: statsStore.deploysByDay[dayKey] || 0,
-    deploysMonth: statsStore.deploysByMonth[monthKey] || 0,
-    deploysYear: statsStore.deploysByYear[yearKey] || 0,
-    deploysTotal: statsStore.deploysTotal || 0,
-    visitsDay: statsStore.visitsByDay[dayKey] || 0,
-    visitsMonth: statsStore.visitsByMonth[monthKey] || 0,
-    visitsYear: statsStore.visitsByYear[yearKey] || 0,
-    visitsTotal: statsStore.visitsTotal || 0,
-  };
+function getVisitorsCount(): number {
+  statsStore = loadStoredStats();
+  return statsStore.visitors;
 }
 
-function recordSiteVisit(): SiteStatsSummary {
-  const { dayKey, monthKey, yearKey } = getDateKeys();
-  statsStore.visitsTotal = (statsStore.visitsTotal || 0) + 1;
-  statsStore.visitsByDay[dayKey] = (statsStore.visitsByDay[dayKey] || 0) + 1;
-  statsStore.visitsByMonth[monthKey] = (statsStore.visitsByMonth[monthKey] || 0) + 1;
-  statsStore.visitsByYear[yearKey] = (statsStore.visitsByYear[yearKey] || 0) + 1;
+function recordSiteVisit(): number {
+  statsStore = loadStoredStats();
+  statsStore.visitors = (statsStore.visitors || 0) + 1;
   saveStoredStats(statsStore);
-  return getStatsSummary();
+  return statsStore.visitors;
 }
 
-function recordSshDeploy(): SiteStatsSummary {
-  const { dayKey, monthKey, yearKey } = getDateKeys();
+function recordSshDeploy(): void {
   statsStore.deploysTotal = (statsStore.deploysTotal || 0) + 1;
-  statsStore.deploysByDay[dayKey] = (statsStore.deploysByDay[dayKey] || 0) + 1;
-  statsStore.deploysByMonth[monthKey] = (statsStore.deploysByMonth[monthKey] || 0) + 1;
-  statsStore.deploysByYear[yearKey] = (statsStore.deploysByYear[yearKey] || 0) + 1;
-  saveStoredStats(statsStore);
-  return getStatsSummary();
 }
 
-function buildSshConnectConfig(ssh: SshCredentials): ConnectConfig {
+function buildSshConnectConfig(ssh: SshCredentials, timeoutMs = 12000): ConnectConfig {
   const cfg: ConnectConfig = {
     host: ssh.host.trim(),
     port: Number(ssh.port) || 22,
-    username: ssh.username.trim() || 'root',
-    readyTimeout: 12000,
+    username: (ssh.username || 'root').trim() || 'root',
+    readyTimeout: timeoutMs,
   };
   if (ssh.authType === 'privateKey') {
     cfg.privateKey = ssh.privateKey || '';
@@ -185,13 +148,13 @@ function buildSshConnectConfig(ssh: SshCredentials): ConnectConfig {
   return cfg;
 }
 
-function connectSsh(ssh: SshCredentials): Promise<Client> {
+function connectSsh(ssh: SshCredentials, timeoutMs = 12000): Promise<Client> {
   return new Promise((resolve, reject) => {
     const conn = new Client();
     conn
       .on('ready', () => resolve(conn))
       .on('error', (err) => reject(err))
-      .connect(buildSshConnectConfig(ssh));
+      .connect(buildSshConnectConfig(ssh, timeoutMs));
   });
 }
 
@@ -255,14 +218,14 @@ async function startServer() {
   app.use(cors());
   app.use(express.json({ limit: '5mb' }));
 
-  // 0. Site Visits & SSH Deploy Statistics
+  // 0. Site Visits Statistics (/opt/selfsteal-ui/data/stats.json)
   app.get('/api/stats', (_req, res) => {
-    res.json({ ok: true, stats: getStatsSummary() });
+    res.json({ visitors: getVisitorsCount() });
   });
 
   app.post('/api/stats/visit', (_req, res) => {
-    const stats = recordSiteVisit();
-    res.json({ ok: true, stats });
+    const visitors = recordSiteVisit();
+    res.json({ visitors });
   });
 
   // 1. Test SSH connection without storing credentials
@@ -301,6 +264,45 @@ async function startServer() {
         ok: false,
         error: `Не удалось подключиться по SSH: ${message}`,
       });
+    }
+  });
+
+  // 1b. Check Xray (Remnanode) presence via SSH before installation
+  // Checks /opt/remnanode directory and docker ps --format '{{.Image}}' for remnawave/node
+  app.post('/api/ssh/check', async (req, res) => {
+    const rawSsh = (req.body?.ssh || req.body) as Partial<SshCredentials> & {
+      user?: string;
+      key?: string;
+    };
+
+    if (!rawSsh || !rawSsh.host) {
+      res.status(400).json({ xray: false, method: null, error: 'Host is required' });
+      return;
+    }
+
+    const ssh: SshCredentials = {
+      host: String(rawSsh.host).trim(),
+      port: Number(rawSsh.port) || 22,
+      username: String(rawSsh.username || rawSsh.user || 'root').trim() || 'root',
+      authType:
+        rawSsh.authType === 'privateKey' || (!rawSsh.password && Boolean(rawSsh.privateKey || rawSsh.key))
+          ? 'privateKey'
+          : 'password',
+      password: rawSsh.password,
+      privateKey: rawSsh.privateKey || rawSsh.key,
+    };
+
+    let conn: Client | null = null;
+    try {
+      conn = await connectSsh(ssh, 2000);
+      const checkCmd = `if [ -d "/opt/remnanode" ]; then echo "XRAY_CHECK:folder"; elif command -v docker >/dev/null 2>&1 && docker ps --format '{{.Image}}' 2>/dev/null | grep -qi 'remnawave/node'; then echo "XRAY_CHECK:docker"; else echo "XRAY_CHECK:none"; fi`;
+      const result = await execRemoteCommand(conn, checkCmd);
+      conn.end();
+      const parsed = parseXrayCheckStdout(result.stdout);
+      res.json(parsed);
+    } catch {
+      if (conn) conn.end();
+      res.json({ xray: false, method: null });
     }
   });
 
@@ -386,7 +388,7 @@ async function startServer() {
     };
 
     try {
-      // STEP 1: SSH Connect & Create Directories
+      // STEP 1: SSH Connect, Check Xray (Remnanode), & Create Directories
       sendEvent({
         type: 'step',
         stepId: 'connect',
@@ -394,6 +396,19 @@ async function startServer() {
         status: 'running',
       });
       conn = await connectSsh(ssh);
+      const xrayRes = await execRemoteCommand(
+        conn,
+        `if [ -d "/opt/remnanode" ]; then echo "XRAY_CHECK:folder"; elif command -v docker >/dev/null 2>&1 && docker ps --format '{{.Image}}' 2>/dev/null | grep -qi 'remnawave/node'; then echo "XRAY_CHECK:docker"; else echo "XRAY_CHECK:none"; fi`
+      );
+      const remnanodeCheck = parseXrayCheckStdout(xrayRes.stdout);
+      sendEvent({
+        type: 'output',
+        stepId: 'connect',
+        stream: 'stdout',
+        text: remnanodeCheck.xray
+          ? `✅ Xray (Remnanode) обнаружен (${remnanodeCheck.method})\n`
+          : `⚠️ Xray не найден — установи Remnanode перед настройкой\n`,
+      });
       await runStepCommand(
         'connect',
         `mkdir -p ${baseDir}/{conf,html/templates,ssl,logs} /var/www/html`,

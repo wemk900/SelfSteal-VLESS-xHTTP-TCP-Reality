@@ -2628,6 +2628,21 @@ export function normalizeIncomingDeployConfig(
   };
 }
 
+export interface XrayCheckResult {
+  xray: boolean;
+  method: 'folder' | 'docker' | null;
+}
 
-
-
+/**
+ * Parses stdout from the remote SSH check for /opt/remnanode or docker remnawave/node image
+ */
+export function parseXrayCheckStdout(stdout: string): XrayCheckResult {
+  const text = stdout || '';
+  if (text.includes('XRAY_CHECK:folder')) {
+    return { xray: true, method: 'folder' };
+  }
+  if (text.includes('XRAY_CHECK:docker') || /remnawave\/node/i.test(text)) {
+    return { xray: true, method: 'docker' };
+  }
+  return { xray: false, method: null };
+}
