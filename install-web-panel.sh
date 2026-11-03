@@ -72,7 +72,7 @@ fi
 # 4. Установка зависимостей и сборка фронтенда
 echo -e "🔨 ${CYAN}[4/5] Установка npm-пакетов и сборка Production фронтенда (npm run build)...${NC}"
 cd "${INSTALL_DIR}"
-npm install
+npm install --legacy-peer-deps
 npm run build
 
 # 5. Запуск Express + SSH2 сервера через PM2 и автозапуск

@@ -17,6 +17,7 @@ import {
   generateSelfstealCliScript,
   generateXrayConfig,
   generateVlessClientUri,
+  normalizeIncomingDeployConfig,
   type StubTemplateId,
 } from './src/utils/generator';
 
@@ -303,15 +304,35 @@ async function startServer() {
     }
   });
 
+  // Active EventSource subscribers for GET /api/deploy/stream
+  const streamSubscribers = new Set<express.Response>();
+  let eventSeq = 0;
+
+  app.get('/api/deploy/stream', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
+    res.write(': connected\n\n');
+
+    streamSubscribers.add(res);
+    req.on('close', () => {
+      streamSubscribers.delete(res);
+    });
+  });
+
   // 2. Live 1-Click SSH Deploy with SSE streaming
   app.post('/api/deploy', async (req, res) => {
-    const config = req.body?.config as SelfStealConfig | undefined;
+    const rawConfig = req.body?.config as (Partial<SelfStealConfig> & { targetPort?: string | number }) | undefined;
     const ssh = req.body?.ssh as SshCredentials | undefined;
 
-    if (!config || !ssh || !ssh.host) {
+    if (!rawConfig || !ssh || !ssh.host) {
       res.status(400).json({ ok: false, error: 'Отсутствуют параметры конфигурации или SSH' });
       return;
     }
+
+    const config = normalizeIncomingDeployConfig(rawConfig);
 
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -320,8 +341,15 @@ async function startServer() {
     res.flushHeaders?.();
 
     const sendEvent = (event: DeploySseEvent) => {
+      eventSeq += 1;
+      const payload = JSON.stringify({ ...event, seq: eventSeq });
       if (!res.writableEnded) {
-        res.write(`data: ${JSON.stringify(event)}\n\n`);
+        res.write(`data: ${payload}\n\n`);
+      }
+      for (const sub of streamSubscribers) {
+        if (!sub.writableEnded) {
+          sub.write(`data: ${payload}\n\n`);
+        }
       }
     };
 

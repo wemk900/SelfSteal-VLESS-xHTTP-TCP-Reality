@@ -1,21 +1,1702 @@
 <!doctype html>
-<html lang="ru" class="dark">
+<html lang="ru">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:," />
     <title>SelfSteal Bash Architect — VLESS XHTTP/TCP Reality</title>
     <meta name="description" content="Генератор Bash-скрипта установки SelfSteal (Caddy/Nginx) для VLESS XHTTP/TCP Reality с поддержкой Let's Encrypt, логирования и готовыми конфигурациями Xray." />
     <meta property="og:title" content="SelfSteal Bash Architect — VLESS XHTTP/TCP Reality" />
     <meta property="og:description" content="Генератор Bash-скрипта установки SelfSteal (Caddy/Nginx) для VLESS XHTTP/TCP Reality с поддержкой Let's Encrypt, логирования и готовыми конфигурациями Xray." />
     <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Unbounded:wght@600&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --sky-50: #f0f9ff;
+        --sky-100: #e0f2fe;
+        --sky-200: #bae6fd;
+        --sky-300: #7dd3fc;
+        --sky-400: #38bdf8;
+        --sky-500: #0ea5e9;
+        --sky-600: #0284c7;
+        --sky-700: #0369a1;
+        --orange: #f97316;
+        --orange-strong: #ea580c;
+        --orange-soft: #ffedd5;
+        --bg: #eef7fe;
+        --bg-raise: #ffffff;
+        --bg-sink: #e0f2fe;
+        --ink: #0b2a42;
+        --ink-2: #3d5a73;
+        --ink-3: #6b8aa3;
+        --line: #c8e4f7;
+        --accent: #0284c7;
+        --accent-ink: #0369a1;
+        --accent-soft: #e0f2fe;
+        --term-bg: #062840;
+        --term-ink: #d9eefb;
+        --term-dim: #7fa8c4;
+        --term-green: #4ade80;
+        --term-amber: #fb923c;
+        --term-red: #f87171;
+        --term-line: #0e3d5e;
+        --radius: 12px;
+        --font-ui: 'Manrope', sans-serif;
+        --font-mono: 'Manrope', sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #04182b;
+          --bg-raise: #082a45;
+          --bg-sink: #062138;
+          --ink: #e6f4fd;
+          --ink-2: #a8c8de;
+          --ink-3: #6f97b1;
+          --line: #11405f;
+          --accent: #38bdf8;
+          --accent-ink: #7dd3fc;
+          --accent-soft: #0a3453;
+          --orange: #fb923c;
+          --orange-strong: #fb923c;
+          --orange-soft: #3d2410;
+          --term-bg: #03121f;
+          --term-ink: #d9eefb;
+          --term-dim: #5f8299;
+          --term-line: #0d2f49;
+        }
+      }
+      * {
+        box-sizing: border-box;
+        font-family: 'Manrope', sans-serif;
+      }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: 'Manrope', sans-serif;
+        font-size: 18px;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
+      a { color: var(--accent-ink); }
+      .wrap { max-width: 1120px; margin: 0 auto; padding: 0 22px; position: relative; z-index: 1; }
+
+      /* ---------- animated sky backdrop ---------- */
+      .sky {
+        position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+        background: linear-gradient(180deg, var(--sky-100) 0%, var(--bg) 340px);
+      }
+      @media (prefers-color-scheme: dark) {
+        .sky { background: linear-gradient(180deg, #06283f 0%, var(--bg) 340px); }
+      }
+      .cloud {
+        position: absolute; border-radius: 999px;
+        background: radial-gradient(closest-side, rgba(255,255,255,.85), rgba(255,255,255,0));
+        filter: blur(2px);
+      }
+      @media (prefers-color-scheme: dark) {
+        .cloud { background: radial-gradient(closest-side, rgba(56,189,248,.14), rgba(56,189,248,0)); }
+      }
+      .cloud.c1 { width: 520px; height: 170px; top: 30px; left: -120px; animation: drift 52s linear infinite alternate; }
+      .cloud.c2 { width: 380px; height: 130px; top: 120px; right: -100px; animation: drift 64s linear infinite alternate-reverse; }
+      .cloud.c3 { width: 300px; height: 110px; top: 240px; left: 34%; animation: drift 74s linear infinite alternate; opacity: .7; }
+      @keyframes drift {
+        from { transform: translateX(0); }
+        to { transform: translateX(90px); }
+      }
+
+      /* ---------- top nav ---------- */
+      .topbar {
+        position: sticky; top: 0; z-index: 20;
+        background: color-mix(in srgb, var(--bg) 85%, transparent);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--line);
+      }
+      .topbar-in { display: flex; align-items: center; gap: 22px; height: 62px; }
+      .brand {
+        display: flex; align-items: center; gap: 10px;
+        font-family: 'Manrope', sans-serif; font-weight: 800; font-size: 17px;
+        color: var(--ink); text-decoration: none; white-space: nowrap;
+      }
+      .brand .dot {
+        width: 10px; height: 10px; border-radius: 50%; background: var(--orange);
+        box-shadow: 0 0 0 4px var(--orange-soft);
+        animation: pulse-dot 2.6s ease-in-out infinite;
+      }
+      @keyframes pulse-dot {
+        0%, 100% { box-shadow: 0 0 0 3px var(--orange-soft); }
+        50% { box-shadow: 0 0 0 6px var(--orange-soft); }
+      }
+      .nav { display: flex; gap: 6px; margin-left: auto; overflow-x: auto; scrollbar-width: none; }
+      .nav::-webkit-scrollbar { display: none; }
+      .nav a {
+        color: var(--ink-2); text-decoration: none; font-size: 16px; font-weight: 600;
+        padding: 7px 12px; border-radius: 8px; white-space: nowrap;
+        transition: color .18s ease, background .18s ease;
+      }
+      .nav a:hover { color: var(--ink); background: var(--bg-sink); }
+      .nav a.nav-deploy {
+        color: var(--orange-strong);
+        background: var(--orange-soft);
+        font-weight: 700;
+      }
+      .nav a.gh { color: var(--ink); font-weight: 700; border: 1px solid var(--line); background: var(--bg-raise); }
+
+      /* ---------- hero ---------- */
+      .hero { padding: 68px 0 10px; }
+      .hero-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 40px; align-items: start; }
+      .kicker {
+        font-family: 'Manrope', sans-serif; font-size: 15px; font-weight: 700; color: var(--accent-ink);
+        letter-spacing: .04em; margin: 0 0 14px;
+      }
+      .kicker .o { color: var(--orange-strong); }
+      h1 {
+        font-size: clamp(38px, 5.8vw, 60px); line-height: 1.05; letter-spacing: -0.02em;
+        margin: 0 0 20px; font-weight: 800;
+      }
+      h1 .hl { color: var(--sky-600); }
+      @media (prefers-color-scheme: dark) { h1 .hl { color: var(--sky-400); } }
+      h1 .thin { color: var(--ink-3); font-weight: 400; }
+      .lede { font-size: 20.5px; color: var(--ink-2); margin: 0 0 28px; max-width: 34em; }
+      .lede strong { color: var(--ink); }
+      .badges { display: flex; flex-wrap: wrap; gap: 9px; margin: 0 0 32px; padding: 0; list-style: none; }
+      .badges li {
+        font-family: 'Manrope', sans-serif; font-size: 14px; color: var(--ink-2);
+        border: 1px solid var(--line); background: var(--bg-raise);
+        padding: 6px 12px; border-radius: 999px;
+      }
+      .badges li b { color: var(--ink); font-weight: 700; }
+      .cta-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+      .btn {
+        display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+        font-size: 17px; font-weight: 700; text-decoration: none;
+        padding: 13px 22px; border-radius: var(--radius); border: 1px solid transparent;
+        cursor: pointer; font-family: 'Manrope', sans-serif;
+        transition: transform .18s ease, filter .18s ease, border-color .18s ease, background .18s ease;
+      }
+      .btn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        transform: none !important;
+      }
+      .btn-primary { background: linear-gradient(135deg, var(--sky-500), var(--sky-600)); color: #fff; box-shadow: 0 10px 24px -10px rgba(2,132,199,.55); }
+      .btn-primary:hover:not(:disabled) { filter: brightness(1.07); transform: translateY(-2px); }
+      .btn-orange { background: linear-gradient(135deg, var(--orange), var(--orange-strong)); color: #fff; box-shadow: 0 10px 24px -10px rgba(234,88,12,.55); }
+      .btn-orange:hover:not(:disabled) { filter: brightness(1.07); transform: translateY(-2px); }
+      .btn-ghost { background: var(--bg-raise); color: var(--ink); border-color: var(--line); }
+      .btn-ghost:hover:not(:disabled) { border-color: var(--orange); color: var(--orange-strong); transform: translateY(-2px); }
+      .hero-note { margin-top: 16px; font-size: 15px; color: var(--ink-3); }
+
+      /* ---------- terminal ---------- */
+      .term {
+        background: var(--term-bg); color: var(--term-ink);
+        border: 1px solid var(--term-line); border-radius: 12px;
+        font-family: 'Manrope', sans-serif; font-size: 15px; line-height: 1.55;
+        overflow: hidden; box-shadow: 0 24px 48px -24px rgba(3,40,66,.5);
+      }
+      .term.float { animation: floaty 7s ease-in-out infinite; }
+      @keyframes floaty {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-7px); }
+      }
+      .term-bar {
+        display: flex; align-items: center; gap: 7px;
+        padding: 12px 16px; border-bottom: 1px solid var(--term-line);
+      }
+      .term-bar i { width: 11px; height: 11px; border-radius: 50%; display: block; flex: none; }
+      .term-bar .r { background: #f0524d; } .term-bar .y { background: var(--orange); } .term-bar .g { background: var(--sky-400); }
+      .term-bar span { margin-left: 8px; color: var(--term-dim); font-size: 14px; font-weight: 600; }
+      .term-bar .copy {
+        margin-left: auto; background: none; border: 1px solid var(--term-line);
+        color: var(--term-dim); font-family: 'Manrope', sans-serif; font-size: 13px; font-weight: 600;
+        padding: 5px 12px; border-radius: 6px; cursor: pointer;
+        transition: color .15s ease, border-color .15s ease;
+      }
+      .term-bar .copy:hover { color: var(--term-ink); border-color: var(--orange); }
+      .term pre { margin: 0; padding: 18px 20px; overflow-x: auto; white-space: pre; font-family: 'Manrope', sans-serif; }
+      .term .c { color: var(--term-dim); }
+      .term .g { color: var(--term-green); }
+      .term .a { color: var(--term-amber); }
+      .term .s { color: var(--sky-300); }
+      .term .e { color: var(--term-red); }
+      .term code { font-family: 'Manrope', sans-serif; }
+      .cursor { display: inline-block; color: var(--orange); animation: blink 1.1s steps(1) infinite; }
+      @keyframes blink { 0%, 55% { opacity: 1; } 56%, 100% { opacity: 0; } }
+
+      .install-block { margin-top: 26px; }
+      .install-block .term pre { white-space: pre-wrap; word-break: break-all; }
+
+      /* ---------- entrance animation ---------- */
+      .feat, .tpl { animation: rise .55s cubic-bezier(.22,.8,.32,1) backwards; }
+      .feat-grid .feat:nth-child(2), .tpl-grid .tpl:nth-child(2) { animation-delay: .05s; }
+      .feat-grid .feat:nth-child(3), .tpl-grid .tpl:nth-child(3) { animation-delay: .1s; }
+      .feat-grid .feat:nth-child(5), .tpl-grid .tpl:nth-child(5) { animation-delay: .05s; }
+      .feat-grid .feat:nth-child(6), .tpl-grid .tpl:nth-child(6) { animation-delay: .1s; }
+      @keyframes rise {
+        from { opacity: 0; transform: translateY(14px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      /* ---------- sections ---------- */
+      section { padding: 62px 0 10px; }
+      .sec-head { margin-bottom: 28px; max-width: 48em; }
+      .sec-head h2 { font-size: clamp(27px, 3.8vw, 36px); letter-spacing: -0.015em; margin: 0 0 10px; font-weight: 800; }
+      .sec-head p { color: var(--ink-2); margin: 0; font-size: 18.5px; }
+      .sec-num { font-family: 'Manrope', sans-serif; font-size: 14.5px; font-weight: 800; color: var(--orange-strong); display: block; margin-bottom: 8px; }
+      .mono-chip { font-family: 'Manrope', sans-serif; font-weight: 600; font-size: .92em; background: var(--bg-sink); padding: 2px 7px; border-radius: 5px; }
+
+      .feat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+      .feat {
+        background: var(--bg-raise); border: 1px solid var(--line);
+        border-radius: var(--radius); padding: 22px;
+        transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+      }
+      .feat:hover { transform: translateY(-4px); border-color: var(--sky-300); box-shadow: 0 16px 30px -18px rgba(2,132,199,.45); }
+      .feat h3 { margin: 0 0 8px; font-size: 19px; font-weight: 700; }
+      .feat p { margin: 0; color: var(--ink-2); font-size: 16.5px; }
+      .feat p code, .step code, .plain code { font-family: 'Manrope', sans-serif; font-weight: 600; font-size: .92em; background: var(--bg-sink); padding: 1px 6px; border-radius: 4px; }
+      .feat .tag {
+        font-family: 'Manrope', sans-serif; font-size: 13px; font-weight: 800; color: var(--accent-ink);
+        background: var(--accent-soft); border-radius: 6px; padding: 3px 9px;
+        display: inline-block; margin-bottom: 12px;
+      }
+      .feat .tag.o { color: var(--orange-strong); background: var(--orange-soft); }
+
+      .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+      .step { border-top: 3px solid var(--sky-400); padding-top: 14px; }
+      .step.hot { border-top-color: var(--orange); }
+      .step .n { font-family: 'Manrope', sans-serif; font-size: 14.5px; font-weight: 700; color: var(--ink-3); }
+      .step h3 { margin: 6px 0 6px; font-size: 19.5px; font-weight: 700; }
+      .step p { margin: 0; color: var(--ink-2); font-size: 16.5px; }
+
+      /* ---------- SSH DEPLOY WIZARD ---------- */
+      .wizard-shell {
+        background: var(--bg-raise);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 26px;
+        box-shadow: 0 20px 44px -24px rgba(2, 132, 199, 0.28);
+      }
+      .wizard-stepper {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-bottom: 26px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--line);
+      }
+      .wiz-tab {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 13px 16px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: var(--bg);
+        color: var(--ink-2);
+        font-size: 16.5px;
+        font-weight: 700;
+        cursor: pointer;
+        text-align: left;
+        transition: all .18s ease;
+      }
+      .wiz-tab:hover {
+        border-color: var(--sky-400);
+        color: var(--ink);
+      }
+      .wiz-tab.active {
+        background: var(--accent-soft);
+        border-color: var(--sky-500);
+        color: var(--ink);
+        box-shadow: 0 8px 20px -12px rgba(2, 132, 199, 0.45);
+      }
+      .wiz-tab.done {
+        border-color: var(--sky-300);
+        color: var(--ink);
+      }
+      .wiz-tab .badge-num {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 15px;
+        font-weight: 800;
+        background: var(--bg-raise);
+        border: 1px solid var(--line);
+        color: var(--accent-ink);
+        flex: none;
+      }
+      .wiz-tab.active .badge-num {
+        background: var(--sky-500);
+        border-color: var(--sky-500);
+        color: #fff;
+      }
+      .wiz-tab.done .badge-num {
+        background: var(--orange);
+        border-color: var(--orange);
+        color: #fff;
+      }
+      .wiz-pane {
+        display: none;
+      }
+      .wiz-pane.active {
+        display: block;
+      }
+      .form-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 18px;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+      .field label {
+        font-size: 15.5px;
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .field .hint {
+        font-size: 14.5px;
+        color: var(--ink-3);
+      }
+      .input, .textarea {
+        width: 100%;
+        padding: 13px 15px;
+        font-size: 17px;
+        font-weight: 500;
+        font-family: 'Manrope', sans-serif;
+        color: var(--ink);
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        outline: none;
+        transition: border-color .16s ease, box-shadow .16s ease;
+      }
+      .input:focus, .textarea:focus {
+        border-color: var(--sky-500);
+        box-shadow: 0 0 0 3px var(--accent-soft);
+      }
+      .textarea {
+        resize: vertical;
+        min-height: 110px;
+      }
+      .seg-row {
+        display: inline-flex;
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 4px;
+        gap: 4px;
+      }
+      .seg-btn {
+        padding: 9px 16px;
+        border-radius: 7px;
+        border: none;
+        background: transparent;
+        color: var(--ink-2);
+        font-size: 15.5px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all .15s ease;
+      }
+      .seg-btn.active {
+        background: var(--sky-500);
+        color: #fff;
+      }
+      .wiz-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 22px;
+        padding-top: 18px;
+        border-top: 1px solid var(--line);
+      }
+      .wiz-alert {
+        margin-top: 14px;
+        padding: 12px 16px;
+        border-radius: 10px;
+        font-size: 16px;
+        font-weight: 600;
+        display: none;
+      }
+      .wiz-alert.error {
+        display: block;
+        background: rgba(248, 113, 113, 0.14);
+        border: 1px solid #f87171;
+        color: #dc2626;
+      }
+      @media (prefers-color-scheme: dark) {
+        .wiz-alert.error { color: #fca5a5; }
+      }
+      .wiz-alert.ok {
+        display: block;
+        background: var(--accent-soft);
+        border: 1px solid var(--sky-400);
+        color: var(--accent-ink);
+      }
+
+      /* Step 2: One-by-one Question Card */
+      .q-progress {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 20px;
+      }
+      .q-pill {
+        padding: 7px 14px;
+        border-radius: 999px;
+        font-size: 14.5px;
+        font-weight: 700;
+        border: 1px solid var(--line);
+        background: var(--bg);
+        color: var(--ink-2);
+        cursor: pointer;
+        transition: all .15s ease;
+      }
+      .q-pill.active {
+        background: var(--sky-500);
+        border-color: var(--sky-500);
+        color: #fff;
+      }
+      .q-pill.answered:not(.active) {
+        border-color: var(--sky-300);
+        color: var(--ink);
+        background: var(--bg-sink);
+      }
+      .q-card {
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 24px;
+      }
+      .q-step-tag {
+        font-size: 14px;
+        font-weight: 800;
+        color: var(--orange-strong);
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        margin-bottom: 6px;
+        display: block;
+      }
+      .q-title {
+        font-size: 22px;
+        font-weight: 800;
+        margin: 0 0 8px;
+      }
+      .q-desc {
+        font-size: 16.5px;
+        color: var(--ink-2);
+        margin: 0 0 18px;
+      }
+      .choice-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      .choice-card {
+        text-align: left;
+        padding: 18px;
+        border-radius: 12px;
+        border: 2px solid var(--line);
+        background: var(--bg-raise);
+        color: var(--ink);
+        cursor: pointer;
+        transition: all .16s ease;
+      }
+      .choice-card:hover {
+        border-color: var(--sky-400);
+      }
+      .choice-card.selected {
+        border-color: var(--sky-500);
+        background: var(--accent-soft);
+      }
+      .choice-card strong {
+        display: block;
+        font-size: 18px;
+        font-weight: 800;
+        margin-bottom: 4px;
+      }
+      .choice-card span {
+        display: block;
+        font-size: 15px;
+        color: var(--ink-2);
+      }
+
+      /* Step 3: Summary & Live Terminal */
+      .summary-strip {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+      .sum-item {
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 12px 15px;
+      }
+      .sum-item .k {
+        font-size: 13.5px;
+        font-weight: 700;
+        color: var(--ink-3);
+        display: block;
+      }
+      .sum-item .v {
+        font-size: 16.5px;
+        font-weight: 800;
+        color: var(--ink);
+        word-break: break-all;
+      }
+      .live-term-pre {
+        max-height: 440px;
+        min-height: 240px;
+        overflow-y: auto;
+        white-space: pre-wrap !important;
+        word-break: break-word;
+      }
+
+      /* menu */
+      .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 36px; }
+      .menu-group h3 {
+        font-size: 14.5px; text-transform: uppercase; letter-spacing: .09em;
+        color: var(--accent-ink); margin: 0 0 10px; font-weight: 800;
+      }
+      .menu-group ul { list-style: none; margin: 0; padding: 0; }
+      .menu-group li {
+        display: flex; gap: 12px; align-items: baseline;
+        padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: 17px;
+      }
+      .menu-group li:last-child { border-bottom: none; }
+      .menu-group .num {
+        font-family: 'Manrope', sans-serif; font-size: 14.5px; font-weight: 800; color: var(--orange-strong);
+        background: var(--orange-soft); border-radius: 5px; min-width: 28px; text-align: center;
+        padding: 2px 5px; flex: none;
+      }
+      .menu-group li span:last-child { color: var(--ink-2); }
+      .menu-group li b { color: var(--ink); font-weight: 700; }
+
+      /* templates */
+      .tpl-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+      .tpl {
+        background: var(--bg-raise); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+        transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+      }
+      .tpl:hover { transform: translateY(-4px); border-color: var(--sky-300); box-shadow: 0 16px 30px -18px rgba(2,132,199,.45); }
+      .tpl .thumb { height: 108px; position: relative; overflow: hidden; border-bottom: 1px solid var(--line); }
+      .tpl .body { padding: 16px 18px 18px; }
+      .tpl h3 { margin: 0 0 5px; font-size: 17.5px; font-weight: 700; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+      .tpl h3 .file { font-family: 'Manrope', sans-serif; font-size: 13px; color: var(--ink-3); font-weight: 500; }
+      .tpl p { margin: 0; font-size: 15.5px; color: var(--ink-2); }
+      .thumb .bar { position: absolute; left: 0; right: 0; top: 0; height: 16px; background: rgba(125,160,190,.22); z-index: 2; }
+      .thumb .bar::after { content: ""; position: absolute; left: 8px; top: 5px; width: 6px; height: 6px; border-radius: 50%; background: rgba(125,160,190,.6); box-shadow: 12px 0 0 rgba(125,160,190,.6), 24px 0 0 rgba(249,115,22,.75); }
+      .t-speed { background: linear-gradient(160deg, #0b3a5c, #062840); }
+      .t-speed .gauge { position: absolute; left: 50%; top: 60%; width: 74px; height: 74px; margin: -37px 0 0 -37px; border-radius: 50%; border: 7px solid #114a73; border-top-color: var(--sky-400); transform: rotate(38deg); }
+      .t-speed .needle {
+        position: absolute; left: 50%; top: 60%; width: 3px; height: 30px; margin: -30px 0 0 -1px;
+        background: var(--orange); border-radius: 2px; transform-origin: bottom center;
+        animation: needle 3.4s ease-in-out infinite;
+      }
+      @keyframes needle {
+        0%, 100% { transform: rotate(-58deg); }
+        45% { transform: rotate(64deg); }
+        60% { transform: rotate(48deg); }
+        80% { transform: rotate(58deg); }
+      }
+      .t-cloud { background: linear-gradient(160deg, #f0f9ff, #d8efff); }
+      .t-cloud .side { position: absolute; left: 0; top: 16px; bottom: 0; width: 30%; background: #bfe3fa; }
+      .t-cloud .doc { position: absolute; width: 26px; height: 34px; background: #fff; border: 1px solid #a9d4f2; border-radius: 3px; top: 34px; animation: bob 4.5s ease-in-out infinite; }
+      .t-cloud .doc:nth-child(4) { animation-delay: .6s; }
+      .t-cloud .doc:nth-child(5) { animation-delay: 1.2s; }
+      @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+      .t-memes { background: #12222f; }
+      .t-memes .card { position: absolute; width: 44px; height: 56px; border-radius: 6px; top: 30px; animation: bob 5s ease-in-out infinite; }
+      .t-over { background: linear-gradient(160deg, #fdf3e7, #ffe8d1); }
+      .t-over .pbar { position: absolute; left: 16%; right: 16%; top: 62%; height: 8px; border-radius: 4px; background: #ffd9ae; overflow: hidden; }
+      .t-over .pbar i { display: block; height: 100%; width: 40%; background: var(--orange); border-radius: 4px; animation: fill 3.2s ease-in-out infinite; }
+      @keyframes fill { 0% { width: 12%; } 55% { width: 78%; } 100% { width: 12%; } }
+      .t-over .code503 { position: absolute; left: 0; right: 0; top: 26px; text-align: center; font-family: 'Manrope', sans-serif; font-weight: 800; font-size: 24px; color: var(--orange-strong); letter-spacing: .08em; }
+      .t-tech { background: linear-gradient(160deg, #0a3a56, #062840); }
+      .t-tech .ln { position: absolute; left: 14%; height: 8px; border-radius: 4px; background: #155e83; }
+      .t-tech .ln.hot { background: var(--orange); animation: blink-soft 2.8s ease-in-out infinite; }
+      @keyframes blink-soft { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+      .t-git { background: #082a45; }
+      .t-git .ln { position: absolute; left: 8%; height: 7px; border-radius: 4px; background: #11405f; }
+      .t-git .ln.g2 { background: var(--sky-500); }
+
+      .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; align-items: start; }
+      .param-list { list-style: none; margin: 0 0 18px; padding: 0; }
+      .param-list li { padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 17px; display: flex; justify-content: space-between; gap: 16px; }
+      .param-list li:last-child { border-bottom: none; }
+      .param-list .k { color: var(--ink-2); flex: none; }
+      .param-list .v { font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 15.5px; text-align: right; word-break: break-all; }
+      .plain { color: var(--ink-2); font-size: 17px; }
+
+      footer {
+        margin-top: 72px; border-top: 1px solid var(--line);
+        padding: 32px 0 46px; color: var(--ink-3); font-size: 16px;
+      }
+      .foot-in { display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: center; justify-content: space-between; }
+      .foot-in .links { display: flex; gap: 20px; flex-wrap: wrap; }
+      .foot-in a { color: var(--ink-2); text-decoration: none; }
+      .foot-in a:hover { color: var(--orange-strong); text-decoration: underline; }
+
+      .toast {
+        position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 16px);
+        background: var(--sky-700); color: #fff; font-size: 16px; font-weight: 700;
+        padding: 11px 20px; border-radius: 999px; opacity: 0; pointer-events: none;
+        transition: opacity .2s ease, transform .2s ease; z-index: 50;
+        box-shadow: 0 12px 28px -10px rgba(3,105,161,.6);
+      }
+      .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+      @media (max-width: 900px) {
+        .hero-grid { grid-template-columns: 1fr; }
+        .feat-grid, .tpl-grid, .steps, .wizard-stepper, .summary-strip { grid-template-columns: 1fr 1fr; }
+        .form-grid { grid-template-columns: 1fr; }
+        .two-col { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 620px) {
+        .feat-grid, .tpl-grid, .steps, .menu-grid, .wizard-stepper, .choice-grid, .summary-strip { grid-template-columns: 1fr; }
+        .hero { padding-top: 40px; }
+        section { padding-top: 44px; }
+        .nav a:not(.gh):not(.nav-deploy) { display: none; }
+        #install .term pre { white-space: pre-wrap; word-break: break-all; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        *, *::before, *::after { animation: none !important; transition: none !important; }
+      }
+    </style>
   </head>
-  <body class="bg-[#0d0a1a] text-slate-100 font-semibold antialiased selection:bg-sky-500/30 selection:text-sky-200">
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+  <body>
+    <div class="sky" aria-hidden="true">
+      <div class="cloud c1"></div>
+      <div class="cloud c2"></div>
+      <div class="cloud c3"></div>
+    </div>
+
+    <div class="topbar">
+      <div class="wrap topbar-in">
+        <a class="brand" href="#top"><span class="dot"></span>selfsteal<span style="color:var(--ink-3)">/vless</span></a>
+        <nav class="nav" aria-label="Основная навигация">
+          <a href="#features">Возможности</a>
+          <a href="#install">Установка</a>
+          <a class="nav-deploy" href="#deploy">SSH Деплой</a>
+          <a href="#menu">Меню</a>
+          <a href="#templates">Заглушки</a>
+          <a href="#xray">Конфиг Xray</a>
+          <a class="gh" href="https://github.com/wemkk1/SelfSteal-VLESS-xHTTP-TCP-Reality" target="_blank" rel="noopener">GitHub</a>
+        </nav>
+      </div>
+    </div>
+
+    <main class="wrap" id="top">
+      <!-- HERO -->
+      <div class="hero">
+        <div class="hero-grid">
+          <div>
+            <p class="kicker">DOCKER SELFSTEAL MANAGEMENT SYSTEM <span class="o">· v2.6.0</span></p>
+            <h1>SelfSteal для <span class="hl">VLESS</span> <span class="thin">—</span> XHTTP / TCP Reality</h1>
+            <p class="lede">
+              Двуязычный Bash-установщик, который разворачивает в Docker сайт-прикрытие
+              для <strong>VLESS + Reality</strong>: <strong>Caddy</strong> или <strong>Nginx</strong>,
+              автоматический SSL от Let's Encrypt и управление одной командой —
+              <strong>selfssteal</strong>.
+            </p>
+            <ul class="badges">
+              <li>OS <b>Ubuntu 20.04+ / Debian 11+</b></li>
+              <li>Docker <b>caddy:2-alpine · nginx:stable-alpine</b></li>
+              <li>Транспорт <b>VLESS · XHTTP · Reality</b></li>
+              <li>Язык <b>EN / RU</b></li>
+            </ul>
+            <div class="cta-row">
+              <a class="btn btn-orange" href="#deploy">SSH Деплой (Мастер)</a>
+              <a class="btn btn-primary" href="https://github.com/wemkk1/SelfSteal-VLESS-xHTTP-TCP-Reality" target="_blank" rel="noopener">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+                Репозиторий на GitHub
+              </a>
+              <a class="btn btn-ghost" href="#install">Команда установки</a>
+            </div>
+            <p class="hero-note">Автор проекта: <a href="https://t.me/wemkz" target="_blank" rel="noopener">t.me/wemkz</a></p>
+
+            <div class="install-block">
+              <div class="term">
+                <div class="term-bar">
+                  <i class="r"></i><i class="y"></i><i class="g"></i>
+                  <span>установка одной командой</span>
+                  <button class="copy" type="button" data-copy="cmd-install">копировать</button>
+                </div>
+                <pre><code id="cmd-install">bash &lt;(curl -fsSL "https://raw.githubusercontent.com/wemkk1/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh")</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="term float" aria-label="Пример вывода команды selfssteal">
+            <div class="term-bar">
+              <i class="r"></i><i class="y"></i><i class="g"></i>
+              <span>root@vps: selfssteal</span>
+            </div>
+            <pre><code><span class="s">🔗 Docker Caddy for Reality SelfSteal</span>
+Management System v2.6.0 (Docker Compose)
+Project: VLESS XHTTP Reality
+
+──────────────────────────────────
+
+<span class="g">✅ Status:  Running</span>
+   Server:  Caddy (caddy:2-alpine)
+   Domain:  poland.example.xyz
+   Port:    9443 (127.0.0.1:9443)
+   SSL:     <span class="g">✅ Valid</span>, <span class="a">73 days left</span> (Let's Encrypt)
+
+<span class="c">Service Management:</span>
+   1) Install / Reinstall    2) Start
+   3) Stop                   4) Restart
+   5) Service status
+
+<span class="c">Website Management:</span>
+   6) Change HTML template
+   7) Change domain
+   8) Switch Caddy ↔ Nginx
+
+<span class="c">Select option [0-14]:</span> <span class="cursor">▊</span></code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- FEATURES -->
+      <section id="features">
+        <div class="sec-head reveal">
+          <span class="sec-num">01 — ЧТО ВНУТРИ</span>
+          <h2>Что делает установщик</h2>
+          <p>Скрипт <span class="mono-chip">install-selfsteal.sh</span> ставит всё сам: Docker, контейнер, сертификат и CLI-меню. Дальше сервисом управляют через него, а не руками по файлам.</p>
+        </div>
+        <div class="feat-grid">
+          <div class="feat reveal">
+            <span class="tag">EN / RU</span>
+            <h3>Два языка интерфейса</h3>
+            <p>При старте установщик спрашивает язык — 1) English или 2) Русский. Весь дальнейший интерфейс и меню работают на выбранном.</p>
+          </div>
+          <div class="feat reveal d1">
+            <span class="tag">DOCKER COMPOSE</span>
+            <h3>Полная контейнеризация</h3>
+            <p>Автоматическая установка Docker и развёртывание контейнера через Docker Compose, с реальным выводом всех команд в терминал.</p>
+          </div>
+          <div class="feat reveal d2">
+            <span class="tag o">CADDY ↔ NGINX</span>
+            <h3>Два веб-сервера на выбор</h3>
+            <p>Caddy (<code>caddy:2-alpine</code>, каталог <code>/opt/ss-caddy</code>) или Nginx (<code>nginx:stable-alpine</code>, каталог <code>/opt/nginx</code>). Переключение — пунктом меню, без переустановки.</p>
+          </div>
+          <div class="feat reveal">
+            <span class="tag o">RANDOM % 6</span>
+            <h3>Случайная заглушка</h3>
+            <p>При установке одна из 6 встроенных HTML-страниц выбирается случайно. Сменить шаблон можно в любой момент из меню.</p>
+          </div>
+          <div class="feat reveal d1">
+            <span class="tag">LET'S ENCRYPT</span>
+            <h3>SSL без ручной рутины</h3>
+            <p>Сертификат Let's Encrypt (ECC P-256), автообновление по cron и перевыпуск при смене домена. В меню виден остаток дней.</p>
+          </div>
+          <div class="feat reveal d2">
+            <span class="tag">МЕНЮ 0–14</span>
+            <h3>Управление одной командой</h3>
+            <p>Глобальный symlink <code>/usr/local/bin/selfssteal</code>: статус, старт/стоп, логи, смена домена и шаблона, полное удаление.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- INSTALL -->
+      <section id="install">
+        <div class="sec-head reveal">
+          <span class="sec-num">02 — УСТАНОВКА</span>
+          <h2>Быстрый старт на VPS</h2>
+          <p>Скачивать репозиторий не нужно — скрипт запускается напрямую с GitHub одной командой.</p>
+        </div>
+        <div class="steps">
+          <div class="step reveal">
+            <span class="n">ШАГ 1</span>
+            <h3>Запусти установщик</h3>
+            <p>Выполни команду ниже на чистом VPS. Установщик сам поставит Docker и развернёт контейнер.</p>
+          </div>
+          <div class="step reveal d1">
+            <span class="n">ШАГ 2</span>
+            <h3>Выбери язык и домен</h3>
+            <p>Укажи язык интерфейса и свой домен — для него выпустится сертификат Let's Encrypt, а заглушка выберется случайно из 6 шаблонов.</p>
+          </div>
+          <div class="step hot reveal d2">
+            <span class="n">ШАГ 3</span>
+            <h3>Пропиши конфиг в Xray</h3>
+            <p>Внеси <code>streamSettings</code> из раздела ниже в свой инбаунд: target <code>127.0.0.1:9443</code>, свой SNI, ключи X25519 и ShortId.</p>
+          </div>
+        </div>
+
+        <div style="display:grid;gap:14px;margin-top:26px">
+          <div class="term reveal">
+            <div class="term-bar">
+              <i class="r"></i><i class="y"></i><i class="g"></i>
+              <span>вариант А — process substitution</span>
+              <button class="copy" type="button" data-copy="cmd-a">копировать</button>
+            </div>
+            <pre><code id="cmd-a">bash &lt;(curl -fsSL "https://raw.githubusercontent.com/wemkk1/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh")</code></pre>
+          </div>
+          <div class="term reveal">
+            <div class="term-bar">
+              <i class="r"></i><i class="y"></i><i class="g"></i>
+              <span>вариант Б — через пайп curl | bash</span>
+              <button class="copy" type="button" data-copy="cmd-b">копировать</button>
+            </div>
+            <pre><code id="cmd-b">curl -fsSL "https://raw.githubusercontent.com/wemkk1/SelfSteal-VLESS-xHTTP-TCP-Reality/refs/heads/main/install-selfsteal.sh" | bash</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- SSH DEPLOY WIZARD -->
+      <section id="deploy">
+        <div class="sec-head reveal">
+          <span class="sec-num">03 — SSH ДЕПЛОЙ</span>
+          <h2>SSH Деплой — интерактивный мастер установки</h2>
+          <p>Автоматическое развёртывание на сервере в 3 шага: подключись по SSH, ответь по очереди на 5 вопросов и запусти установку с выводом живого терминала через SSE (<span class="mono-chip">/api/deploy/stream</span>).</p>
+        </div>
+
+        <div class="wizard-shell reveal">
+          <!-- Stepper Navigation -->
+          <div class="wizard-stepper" role="tablist" aria-label="Шаги мастера SSH Деплой">
+            <button type="button" class="wiz-tab active" id="wiz-tab-1" data-goto-step="1" role="tab" aria-selected="true">
+              <span class="badge-num">1</span>
+              <span>Шаг 1: SSH-подключение</span>
+            </button>
+            <button type="button" class="wiz-tab" id="wiz-tab-2" data-goto-step="2" role="tab" aria-selected="false">
+              <span class="badge-num">2</span>
+              <span>Шаг 2: Параметры установки</span>
+            </button>
+            <button type="button" class="wiz-tab" id="wiz-tab-3" data-goto-step="3" role="tab" aria-selected="false">
+              <span class="badge-num">3</span>
+              <span>Шаг 3: Запуск и терминал</span>
+            </button>
+          </div>
+
+          <!-- STEP 1: SSH CONNECTION -->
+          <div class="wiz-pane active" id="wiz-pane-1" role="tabpanel" aria-labelledby="wiz-tab-1">
+            <div class="form-grid">
+              <div class="field">
+                <label for="ssh-host">IPv4 / Хост сервера (host)</label>
+                <input id="ssh-host" class="input" type="text" placeholder="например: 185.212.140.42" autocomplete="off" />
+                <span class="hint">IP-адрес или домен вашего VPS</span>
+              </div>
+              <div class="field">
+                <label for="ssh-port">SSH Порт (port)</label>
+                <input id="ssh-port" class="input" type="number" value="22" min="1" max="65535" />
+                <span class="hint">По умолчанию 22</span>
+              </div>
+              <div class="field">
+                <label for="ssh-user">Пользователь (user)</label>
+                <input id="ssh-user" class="input" type="text" value="root" />
+                <span class="hint">По умолчанию root</span>
+              </div>
+            </div>
+
+            <div class="field" style="margin-bottom:16px">
+              <label>Способ авторизации SSH</label>
+              <div>
+                <div class="seg-row" role="group" aria-label="Способ авторизации SSH">
+                  <button type="button" class="seg-btn active" id="auth-btn-password" data-auth-type="password">Пароль (Password)</button>
+                  <button type="button" class="seg-btn" id="auth-btn-key" data-auth-type="privateKey">Приватный ключ (SSH Key)</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="field" id="ssh-password-wrap">
+              <label for="ssh-password">Пароль SSH (password)</label>
+              <input id="ssh-password" class="input" type="password" placeholder="Введите пароль пользователя root..." autocomplete="new-password" />
+            </div>
+
+            <div class="field" id="ssh-key-wrap" style="display:none">
+              <label for="ssh-key">Приватный SSH-ключ (key)</label>
+              <textarea id="ssh-key" class="textarea" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----"></textarea>
+            </div>
+
+            <div class="wiz-alert" id="step1-alert" role="alert"></div>
+
+            <div class="wiz-actions">
+              <span class="hint">Учётные данные передаются напрямую в <code>POST /api/deploy</code> и не сохраняются на диске</span>
+              <button type="button" class="btn btn-primary" id="btn-to-step2">Далее: Параметры установки →</button>
+            </div>
+          </div>
+
+          <!-- STEP 2: ONE-BY-ONE QUESTIONS -->
+          <div class="wiz-pane" id="wiz-pane-2" role="tabpanel" aria-labelledby="wiz-tab-2">
+            <div class="q-progress" aria-label="Вопросы параметров установки">
+              <button type="button" class="q-pill active" data-q-idx="0">1. Домен</button>
+              <button type="button" class="q-pill" data-q-idx="1">2. Веб-сервер</button>
+              <button type="button" class="q-pill" data-q-idx="2">3. Транспорт</button>
+              <button type="button" class="q-pill" data-q-idx="3">4. XHTTP Path</button>
+              <button type="button" class="q-pill" data-q-idx="4">5. Target Port</button>
+            </div>
+
+            <!-- Question 1: Domain -->
+            <div class="q-card" data-q-card="0">
+              <span class="q-step-tag">Вопрос 1 из 5 · Домен</span>
+              <h3 class="q-title">Какой домен использовать для SelfSteal и SSL?</h3>
+              <p class="q-desc">На этот домен будет выпущен сертификат Let's Encrypt, и он будет прописан в <code>serverNames (SNI)</code>.</p>
+              <div class="field">
+                <label for="q-domain">Домен (SNI)</label>
+                <input id="q-domain" class="input" type="text" value="poland.example.xyz" placeholder="например: poland.example.xyz" />
+              </div>
+            </div>
+
+            <!-- Question 2: Web Server -->
+            <div class="q-card" data-q-card="1" style="display:none">
+              <span class="q-step-tag">Вопрос 2 из 5 · Веб-сервер</span>
+              <h3 class="q-title">Какой веб-сервер развернуть в Docker?</h3>
+              <p class="q-desc">Выбери контейнер для отдачи сайта-заглушки и приёма трафика Reality.</p>
+              <div class="choice-grid">
+                <button type="button" class="choice-card selected" data-ws-choice="caddy">
+                  <strong>Caddy (caddy:2-alpine)</strong>
+                  <span>Каталог /opt/ss-caddy · HTTP/2 + TLS 1.3</span>
+                </button>
+                <button type="button" class="choice-card" data-ws-choice="nginx">
+                  <strong>Nginx (nginx:stable-alpine)</strong>
+                  <span>Каталог /opt/nginx · классический reverse-proxy</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Question 3: Transport -->
+            <div class="q-card" data-q-card="2" style="display:none">
+              <span class="q-step-tag">Вопрос 3 из 5 · Транспорт</span>
+              <h3 class="q-title">Какой транспорт использовать для VLESS Reality?</h3>
+              <p class="q-desc">XHTTP (SplitHTTP) маскирует передачу чанков по пути, а TCP использует классический поток Vision.</p>
+              <div class="choice-grid">
+                <button type="button" class="choice-card selected" data-tr-choice="xhttp">
+                  <strong>XHTTP (SplitHTTP)</strong>
+                  <span>Передача чанков через заданный XHTTP Path</span>
+                </button>
+                <button type="button" class="choice-card" data-tr-choice="tcp">
+                  <strong>TCP (xtls-rprx-vision)</strong>
+                  <span>Классический VLESS TCP Reality</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Question 4: XHTTP Path -->
+            <div class="q-card" data-q-card="3" style="display:none">
+              <span class="q-step-tag">Вопрос 4 из 5 · XHTTP Path</span>
+              <h3 class="q-title">Какой путь (XHTTP Path) настроить?</h3>
+              <p class="q-desc">Укажи URL-путь для проксирования XHTTP-чанков (например, <code>/media/v3/chunk/</code>).</p>
+              <div class="field">
+                <label for="q-xhttp-path">XHTTP Path</label>
+                <input id="q-xhttp-path" class="input" type="text" value="/media/v3/chunk/" placeholder="/media/v3/chunk/" />
+              </div>
+            </div>
+
+            <!-- Question 5: Target Port -->
+            <div class="q-card" data-q-card="4" style="display:none">
+              <span class="q-step-tag">Вопрос 5 из 5 · Target Port</span>
+              <h3 class="q-title">Какой локальный Target порт использовать?</h3>
+              <p class="q-desc">Локальный адрес и порт, который слушает контейнер SelfSteal (и куда Xray направляет Reality dest).</p>
+              <div class="field">
+                <label for="q-target-port">Target Port / Dest</label>
+                <input id="q-target-port" class="input" type="text" value="127.0.0.1:9443" placeholder="например: 9443 или 127.0.0.1:9443" />
+              </div>
+            </div>
+
+            <div class="wiz-alert" id="step2-alert" role="alert"></div>
+
+            <div class="wiz-actions">
+              <button type="button" class="btn btn-ghost" id="btn-q-prev">← Назад</button>
+              <button type="button" class="btn btn-primary" id="btn-q-next">Следующий вопрос →</button>
+            </div>
+          </div>
+
+          <!-- STEP 3: LAUNCH & LIVE SSE TERMINAL -->
+          <div class="wiz-pane" id="wiz-pane-3" role="tabpanel" aria-labelledby="wiz-tab-3">
+            <div class="summary-strip" aria-label="Сводка параметров перед запуском">
+              <div class="sum-item">
+                <span class="k">SSH Сервер</span>
+                <span class="v" id="sum-ssh">root@127.0.0.1:22</span>
+              </div>
+              <div class="sum-item">
+                <span class="k">Домен (SNI)</span>
+                <span class="v" id="sum-domain">poland.example.xyz</span>
+              </div>
+              <div class="sum-item">
+                <span class="k">Веб-сервер</span>
+                <span class="v" id="sum-ws">Caddy (/opt/ss-caddy)</span>
+              </div>
+              <div class="sum-item">
+                <span class="k">Транспорт</span>
+                <span class="v" id="sum-tr">XHTTP</span>
+              </div>
+              <div class="sum-item">
+                <span class="k">XHTTP Path</span>
+                <span class="v" id="sum-path">/media/v3/chunk/</span>
+              </div>
+              <div class="sum-item">
+                <span class="k">Target Port</span>
+                <span class="v" id="sum-target">127.0.0.1:9443</span>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:20px">
+              <button type="button" class="btn btn-orange" id="btn-deploy-run">🚀 Установить</button>
+              <button type="button" class="btn btn-ghost" id="btn-back-step2">← Изменить параметры</button>
+              <span id="deploy-status-badge" class="mono-chip">Готов к установке</span>
+            </div>
+
+            <div class="term">
+              <div class="term-bar">
+                <i class="r"></i><i class="y"></i><i class="g"></i>
+                <span id="deploy-term-title">SSE Stream · /api/deploy/stream</span>
+                <button class="copy" type="button" data-copy="deploy-term-log">копировать</button>
+              </div>
+              <pre class="live-term-pre"><code id="deploy-term-log">Ожидание запуска установки...
+Нажмите кнопку «Установить», чтобы отправить POST /api/deploy и подключиться к потоку /api/deploy/stream.</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MENU -->
+      <section id="menu">
+        <div class="sec-head reveal">
+          <span class="sec-num">04 — МЕНЮ SELFSTEAL</span>
+          <h2>Все 15 пунктов управления</h2>
+          <p>Команда <span class="mono-chip">selfssteal</span> показывает текущий статус — Running/Stopped, домен, сервер и остаток дней SSL — и меню ниже.</p>
+        </div>
+        <div class="menu-grid">
+          <div class="menu-group reveal">
+            <h3>Service Management</h3>
+            <ul>
+              <li><span class="num">1</span><span><b>Install / Reinstall</b> — установка или переустановка</span></li>
+              <li><span class="num">2</span><span><b>Start service</b> — запуск сервиса</span></li>
+              <li><span class="num">3</span><span><b>Stop service</b> — остановка сервиса</span></li>
+              <li><span class="num">4</span><span><b>Restart service</b> — перезапуск</span></li>
+              <li><span class="num">5</span><span><b>Service status</b> — статус сервиса</span></li>
+            </ul>
+          </div>
+          <div class="menu-group reveal d1">
+            <h3>Website Management</h3>
+            <ul>
+              <li><span class="num">6</span><span><b>Change HTML template</b> — смена заглушки (1–6 или Random)</span></li>
+              <li><span class="num">7</span><span><b>Change domain</b> — смена домена с перевыпуском SSL</span></li>
+              <li><span class="num">8</span><span><b>Switch web server</b> — переключение Caddy ↔ Nginx</span></li>
+            </ul>
+          </div>
+          <div class="menu-group reveal">
+            <h3>Logs &amp; Monitoring</h3>
+            <ul>
+              <li><span class="num">9</span><span><b>View logs</b> — просмотр логов (tail -f)</span></li>
+              <li><span class="num">10</span><span><b>Log sizes</b> — размеры логов</span></li>
+              <li><span class="num">11</span><span><b>Clean logs</b> — очистка логов</span></li>
+            </ul>
+          </div>
+          <div class="menu-group reveal d1">
+            <h3>SSL &amp; Maintenance</h3>
+            <ul>
+              <li><span class="num">12</span><span><b>Renew SSL certificate</b> — обновление сертификата</span></li>
+              <li><span class="num">13</span><span><b>Edit web server config</b> — редактирование конфига</span></li>
+              <li><span class="num">14</span><span><b>Uninstall SelfSteal</b> — полное удаление</span></li>
+              <li><span class="num">0</span><span><b>Exit</b> — выход из меню</span></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- TEMPLATES -->
+      <section id="templates">
+        <div class="sec-head reveal">
+          <span class="sec-num">05 — ЗАГЛУШКИ</span>
+          <h2>6 встроенных HTML-шаблонов</h2>
+          <p>Маскировочные страницы, которые видит посетитель домена. Одна выбирается случайно при установке, остальные лежат в <span class="mono-chip">html/templates/</span> и меняются пунктом 6 меню.</p>
+        </div>
+        <div class="tpl-grid">
+          <div class="tpl reveal">
+            <div class="thumb t-speed"><div class="bar"></div><div class="gauge"></div><div class="needle"></div></div>
+            <div class="body">
+              <h3>Speedtest <span class="file">1-speedtest.html</span></h3>
+              <p>Спидтест с анимированным SVG-гейджем, пингом и цифрами скорости.</p>
+            </div>
+          </div>
+          <div class="tpl reveal d1">
+            <div class="thumb t-cloud"><div class="bar"></div><div class="side"></div><div class="doc" style="left:38%"></div><div class="doc" style="left:56%"></div><div class="doc" style="left:74%"></div></div>
+            <div class="body">
+              <h3>Cloud Storage <span class="file">2-cloud.html</span></h3>
+              <p>Облачное хранилище файлов с сайдбаром, квотой диска и сеткой документов.</p>
+            </div>
+          </div>
+          <div class="tpl reveal d2">
+            <div class="thumb t-memes"><div class="bar"></div><div class="card" style="left:10%;background:#1d4d6b"></div><div class="card" style="left:38%;background:#7c4a1e;animation-delay:.7s"></div><div class="card" style="left:66%;background:#155e83;animation-delay:1.3s"></div></div>
+            <div class="body">
+              <h3>MemeDump <span class="file">3-memes.html</span></h3>
+              <p>Лента с мемами в тёмной теме, с карточками и лайками.</p>
+            </div>
+          </div>
+          <div class="tpl reveal">
+            <div class="thumb t-over"><div class="bar"></div><div class="code503">503</div><div class="pbar"><i></i></div></div>
+            <div class="body">
+              <h3>Overloaded <span class="file">4-overloaded.html</span></h3>
+              <p>Страница «Сервис временно перегружен» (HTTP 503) с живым прогресс-баром.</p>
+            </div>
+          </div>
+          <div class="tpl reveal d1">
+            <div class="thumb t-tech"><div class="bar"></div><div class="ln" style="top:36px;width:44%"></div><div class="ln" style="top:54px;width:62%;background:#0f4a6e"></div><div class="ln hot" style="top:72px;width:30%"></div></div>
+            <div class="body">
+              <h3>Nexora Systems <span class="file">5-tech.html</span></h3>
+              <p>Технический лендинг инфраструктурной компании.</p>
+            </div>
+          </div>
+          <div class="tpl reveal d2">
+            <div class="thumb t-git"><div class="bar"></div><div class="ln g2" style="top:30px;width:36%"></div><div class="ln" style="top:48px;width:70%"></div><div class="ln" style="top:64px;width:56%"></div><div class="ln" style="top:80px;width:64%"></div></div>
+            <div class="body">
+              <h3>GitPage <span class="file">6-gitpage.html</span></h3>
+              <p>Страница репозитория в стиле GitHub: <span style="font-weight:700;font-size:14px">wemk / core-infra</span>.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- STRUCTURE -->
+      <section id="structure">
+        <div class="sec-head reveal">
+          <span class="sec-num">06 — СТРУКТУРА</span>
+          <h2>Что лежит в /opt/ss-caddy</h2>
+          <p>Всё, что создаёт установщик на сервере: compose-манифест, конфиг, активная заглушка и шаблоны, сертификаты и логи.</p>
+        </div>
+        <div class="term reveal">
+          <div class="term-bar">
+            <i class="r"></i><i class="y"></i><i class="g"></i>
+            <span>/opt/ss-caddy — дерево каталогов</span>
+          </div>
+          <pre><code>/usr/local/bin/selfssteal ─────► symlink на /opt/ss-caddy/selfssteal.sh
+
+/opt/ss-caddy/
+├── docker-compose.yml        <span class="c"># манифест: selfsteal-caddy, caddy:2-alpine, host network</span>
+├── selfssteal.sh             <span class="c"># CLI-утилита и интерактивное меню 0–14</span>
+├── conf/
+│   └── Caddyfile             <span class="c"># конфигурация Caddy, слушает 127.0.0.1:9443</span>
+├── html/
+│   ├── index.html            <span class="c"># активная заглушка (случайная из 6)</span>
+│   └── templates/            <span class="c"># все 6 шаблонов: 1-speedtest … 6-gitpage</span>
+├── ssl/
+│   ├── fullchain.pem         <span class="c"># сертификат Let's Encrypt (ECC P-256)</span>
+│   ├── privkey.pem           <span class="c"># приватный ключ TLS (chmod 600)</span>
+│   └── renew-hook.sh         <span class="c"># автообновление сертификата по cron</span>
+└── logs/
+    ├── access.log            <span class="c"># логи входящих запросов</span>
+    └── error.log             <span class="c"># ошибки и предупреждения TLS</span></code></pre>
+        </div>
+      </section>
+
+      <!-- XRAY CONFIG -->
+      <section id="xray">
+        <div class="sec-head reveal">
+          <span class="sec-num">07 — КОНФИГ XRAY</span>
+          <h2>streamSettings для инбаунда</h2>
+          <p>SelfSteal отдаёт сайт-прикрытие на <span class="mono-chip">127.0.0.1:9443</span> — этот адрес указывается как target (dest) в Reality. Значения домена, ключей и ShortId подставь свои.</p>
+        </div>
+        <div class="two-col">
+          <div class="reveal">
+            <ul class="param-list">
+              <li><span class="k">Target (Dest)</span><span class="v" id="xray-param-target">127.0.0.1:9443</span></li>
+              <li><span class="k">ServerNames (SNI)</span><span class="v" id="xray-param-sni">poland.example.xyz</span></li>
+              <li><span class="k">XHTTP Path</span><span class="v" id="xray-param-path">/media/v3/chunk/</span></li>
+              <li><span class="k">Private Key</span><span class="v">YOUR_X25519_PRIVATE_KEY</span></li>
+              <li><span class="k">Public Key</span><span class="v">YOUR_X25519_PUBLIC_KEY</span></li>
+              <li><span class="k">ShortId</span><span class="v">a1b2c3d4e5f60718</span></li>
+            </ul>
+            <p class="plain">
+              Полный URL пути XHTTP в примере из README:
+              <code>poland.example.xyz/media/v3/chunk/</code>. Режим XHTTP — <code>auto</code>,
+              поле <code>show</code> в realitySettings выключено.
+            </p>
+          </div>
+          <div class="term reveal d1">
+            <div class="term-bar">
+              <i class="r"></i><i class="y"></i><i class="g"></i>
+              <span>streamSettings.json</span>
+              <button class="copy" type="button" data-copy="cfg-xray">копировать</button>
+            </div>
+            <pre><code id="cfg-xray">{
+  "streamSettings": {
+    "network": "xhttp",
+    "security": "reality",
+    "realitySettings": {
+      "show": false,
+      "serverNames": ["poland.example.xyz"],
+      "privateKey": "YOUR_X25519_PRIVATE_KEY",
+      "publicKey": "YOUR_X25519_PUBLIC_KEY",
+      "shortIds": ["a1b2c3d4e5f60718"]
+    },
+    "xhttpSettings": {
+      "path": "/media/v3/chunk/",
+      "host": "poland.example.xyz",
+      "mode": "auto"
+    }
+  }
+}</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        <div class="foot-in">
+          <span>SelfSteal VLESS xHTTP/TCP Reality — Docker Management System v2.6.0</span>
+          <div class="links">
+            <a href="https://github.com/wemkk1/SelfSteal-VLESS-xHTTP-TCP-Reality" target="_blank" rel="noopener">GitHub: wemkk1/SelfSteal-VLESS-xHTTP-TCP-Reality</a>
+            <a href="https://t.me/wemkz" target="_blank" rel="noopener">Автор: t.me/wemkz</a>
+          </div>
+        </div>
+      </footer>
+    </main>
+
+    <div class="toast" id="toast" role="status">Скопировано в буфер обмена</div>
+
+    <script>
+      (function () {
+        /* --- copy buttons --- */
+        var toast = document.getElementById('toast');
+        var timer = null;
+        function showToast(msg) {
+          toast.textContent = msg;
+          toast.classList.add('show');
+          clearTimeout(timer);
+          timer = setTimeout(function () { toast.classList.remove('show'); }, 2200);
+        }
+        function fallbackCopy(text) {
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          var ok = false;
+          try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+          document.body.removeChild(ta);
+          return ok;
+        }
+        document.querySelectorAll('[data-copy]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var target = document.getElementById(btn.getAttribute('data-copy'));
+            if (!target) return;
+            var text = target.textContent;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(text).then(function () {
+                showToast('Скопировано в буфер обмена');
+              }, function () {
+                showToast(fallbackCopy(text) ? 'Скопировано в буфер обмена' : 'Не удалось скопировать — выдели текст вручную');
+              });
+            } else {
+              showToast(fallbackCopy(text) ? 'Скопировано в буфер обмена' : 'Не удалось скопировать — выдели текст вручную');
+            }
+          });
+        });
+
+        /* --- SSH DEPLOY WIZARD STATE --- */
+        var wizardState = {
+          step: 1,
+          questionIdx: 0,
+          ssh: {
+            host: '',
+            port: 22,
+            username: 'root',
+            authType: 'password',
+            password: '',
+            privateKey: ''
+          },
+          config: {
+            domain: 'poland.example.xyz',
+            webServer: 'caddy',
+            transport: 'xhttp',
+            xhttpPath: '/media/v3/chunk/',
+            target: '127.0.0.1:9443'
+          }
+        };
+
+        var hostInput = document.getElementById('ssh-host');
+        var portInput = document.getElementById('ssh-port');
+        var userInput = document.getElementById('ssh-user');
+        var passInput = document.getElementById('ssh-password');
+        var keyInput = document.getElementById('ssh-key');
+        var passWrap = document.getElementById('ssh-password-wrap');
+        var keyWrap = document.getElementById('ssh-key-wrap');
+        var step1Alert = document.getElementById('step1-alert');
+        var step2Alert = document.getElementById('step2-alert');
+
+        var qDomainInput = document.getElementById('q-domain');
+        var qPathInput = document.getElementById('q-xhttp-path');
+        var qTargetInput = document.getElementById('q-target-port');
+        var btnQPrev = document.getElementById('btn-q-prev');
+        var btnQNext = document.getElementById('btn-q-next');
+
+        function syncStateFromInputs() {
+          wizardState.ssh.host = (hostInput.value || '').trim();
+          wizardState.ssh.port = parseInt(portInput.value, 10) || 22;
+          wizardState.ssh.username = (userInput.value || 'root').trim() || 'root';
+          wizardState.ssh.password = passInput.value || '';
+          wizardState.ssh.privateKey = keyInput.value || '';
+
+          var rawDomain = (qDomainInput.value || '').trim().replace(/^https?:\/\//i, '').split('/')[0];
+          wizardState.config.domain = rawDomain || 'poland.example.xyz';
+
+          var rawPath = (qPathInput.value || '/media/v3/chunk/').trim();
+          if (rawPath.charAt(0) !== '/') rawPath = '/' + rawPath;
+          if (rawPath.length > 1 && rawPath.charAt(rawPath.length - 1) !== '/') rawPath = rawPath + '/';
+          wizardState.config.xhttpPath = rawPath;
+
+          var rawTarget = (qTargetInput.value || '127.0.0.1:9443').trim();
+          if (/^\d+$/.test(rawTarget)) {
+            rawTarget = '127.0.0.1:' + rawTarget;
+          }
+          wizardState.config.target = rawTarget;
+        }
+
+        function updateStep3Summary() {
+          syncStateFromInputs();
+          document.getElementById('sum-ssh').textContent =
+            wizardState.ssh.username + '@' + (wizardState.ssh.host || '—') + ':' + wizardState.ssh.port;
+          document.getElementById('sum-domain').textContent = wizardState.config.domain;
+          document.getElementById('sum-ws').textContent =
+            wizardState.config.webServer === 'caddy' ? 'Caddy (/opt/ss-caddy)' : 'Nginx (/opt/nginx)';
+          document.getElementById('sum-tr').textContent = wizardState.config.transport.toUpperCase();
+          document.getElementById('sum-path').textContent =
+            wizardState.config.transport === 'xhttp' ? wizardState.config.xhttpPath : '— (TCP)';
+          document.getElementById('sum-target').textContent = wizardState.config.target;
+        }
+
+        function setWizardStep(stepNum) {
+          wizardState.step = stepNum;
+          for (var i = 1; i <= 3; i++) {
+            var tab = document.getElementById('wiz-tab-' + i);
+            var pane = document.getElementById('wiz-pane-' + i);
+            if (!tab || !pane) continue;
+            var isActive = i === stepNum;
+            tab.classList.toggle('active', isActive);
+            tab.classList.toggle('done', i < stepNum);
+            tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            pane.classList.toggle('active', isActive);
+          }
+          if (stepNum === 2) {
+            renderQuestion(wizardState.questionIdx);
+          } else if (stepNum === 3) {
+            updateStep3Summary();
+          }
+        }
+
+        function validateStep1() {
+          syncStateFromInputs();
+          if (!wizardState.ssh.host) {
+            step1Alert.textContent = 'Укажите IP-адрес или хост сервера для подключения по SSH.';
+            step1Alert.className = 'wiz-alert error';
+            hostInput.focus();
+            return false;
+          }
+          if (wizardState.ssh.authType === 'password' && !wizardState.ssh.password) {
+            step1Alert.textContent = 'Введите пароль SSH для пользователя ' + wizardState.ssh.username + '.';
+            step1Alert.className = 'wiz-alert error';
+            passInput.focus();
+            return false;
+          }
+          if (wizardState.ssh.authType === 'privateKey' && !wizardState.ssh.privateKey.trim()) {
+            step1Alert.textContent = 'Вставьте приватный SSH-ключ (PEM / OpenSSH).';
+            step1Alert.className = 'wiz-alert error';
+            keyInput.focus();
+            return false;
+          }
+          step1Alert.className = 'wiz-alert';
+          step1Alert.textContent = '';
+          return true;
+        }
+
+        /* Auth Type Toggle */
+        document.querySelectorAll('[data-auth-type]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var type = btn.getAttribute('data-auth-type');
+            wizardState.ssh.authType = type;
+            document.getElementById('auth-btn-password').classList.toggle('active', type === 'password');
+            document.getElementById('auth-btn-key').classList.toggle('active', type === 'privateKey');
+            passWrap.style.display = type === 'password' ? '' : 'none';
+            keyWrap.style.display = type === 'privateKey' ? '' : 'none';
+            step1Alert.className = 'wiz-alert';
+          });
+        });
+
+        document.getElementById('btn-to-step2').addEventListener('click', function () {
+          if (validateStep1()) {
+            setWizardStep(2);
+          }
+        });
+
+        /* Stepper Tab Clicks */
+        document.querySelectorAll('[data-goto-step]').forEach(function (tab) {
+          tab.addEventListener('click', function () {
+            var targetStep = parseInt(tab.getAttribute('data-goto-step'), 10);
+            if (targetStep > 1 && !validateStep1()) {
+              setWizardStep(1);
+              return;
+            }
+            setWizardStep(targetStep);
+          });
+        });
+
+        /* Step 2: Question Navigation (0..4) */
+        function renderQuestion(idx) {
+          wizardState.questionIdx = idx;
+          step2Alert.className = 'wiz-alert';
+          step2Alert.textContent = '';
+
+          document.querySelectorAll('[data-q-card]').forEach(function (card) {
+            var cIdx = parseInt(card.getAttribute('data-q-card'), 10);
+            card.style.display = cIdx === idx ? '' : 'none';
+          });
+
+          document.querySelectorAll('[data-q-idx]').forEach(function (pill) {
+            var pIdx = parseInt(pill.getAttribute('data-q-idx'), 10);
+            pill.classList.toggle('active', pIdx === idx);
+            pill.classList.toggle('answered', pIdx < idx);
+          });
+
+          btnQPrev.textContent = idx === 0 ? '← К Шагу 1 (SSH)' : '← Предыдущий вопрос';
+          btnQNext.textContent = idx === 4 ? 'Далее: К запуску (Шаг 3) →' : 'Следующий вопрос →';
+        }
+
+        document.querySelectorAll('[data-q-idx]').forEach(function (pill) {
+          pill.addEventListener('click', function () {
+            var targetIdx = parseInt(pill.getAttribute('data-q-idx'), 10);
+            renderQuestion(targetIdx);
+          });
+        });
+
+        document.querySelectorAll('[data-ws-choice]').forEach(function (card) {
+          card.addEventListener('click', function () {
+            var ws = card.getAttribute('data-ws-choice');
+            wizardState.config.webServer = ws;
+            document.querySelectorAll('[data-ws-choice]').forEach(function (c) {
+              c.classList.toggle('selected', c.getAttribute('data-ws-choice') === ws);
+            });
+          });
+        });
+
+        document.querySelectorAll('[data-tr-choice]').forEach(function (card) {
+          card.addEventListener('click', function () {
+            var tr = card.getAttribute('data-tr-choice');
+            wizardState.config.transport = tr;
+            document.querySelectorAll('[data-tr-choice]').forEach(function (c) {
+              c.classList.toggle('selected', c.getAttribute('data-tr-choice') === tr);
+            });
+          });
+        });
+
+        btnQPrev.addEventListener('click', function () {
+          if (wizardState.questionIdx > 0) {
+            renderQuestion(wizardState.questionIdx - 1);
+          } else {
+            setWizardStep(1);
+          }
+        });
+
+        btnQNext.addEventListener('click', function () {
+          syncStateFromInputs();
+          if (wizardState.questionIdx === 0 && !qDomainInput.value.trim()) {
+            step2Alert.textContent = 'Введите домен для SelfSteal (например: poland.example.xyz).';
+            step2Alert.className = 'wiz-alert error';
+            qDomainInput.focus();
+            return;
+          }
+          if (wizardState.questionIdx === 4 && !qTargetInput.value.trim()) {
+            step2Alert.textContent = 'Укажите Target порт (например: 9443 или 127.0.0.1:9443).';
+            step2Alert.className = 'wiz-alert error';
+            qTargetInput.focus();
+            return;
+          }
+          if (wizardState.questionIdx < 4) {
+            renderQuestion(wizardState.questionIdx + 1);
+          } else {
+            setWizardStep(3);
+          }
+        });
+
+        document.getElementById('btn-back-step2').addEventListener('click', function () {
+          setWizardStep(2);
+        });
+
+        /* Step 3: Launch Deploy via POST /api/deploy + EventSource(/api/deploy/stream) */
+        var btnDeployRun = document.getElementById('btn-deploy-run');
+        var termLog = document.getElementById('deploy-term-log');
+        var statusBadge = document.getElementById('deploy-status-badge');
+        var activeEventSource = null;
+
+        function appendTermLine(text) {
+          termLog.textContent += text;
+          var pre = termLog.parentElement;
+          if (pre) {
+            pre.scrollTop = pre.scrollHeight;
+          }
+        }
+
+        btnDeployRun.addEventListener('click', function () {
+          if (!validateStep1()) {
+            setWizardStep(1);
+            return;
+          }
+          syncStateFromInputs();
+
+          if (activeEventSource) {
+            activeEventSource.close();
+            activeEventSource = null;
+          }
+
+          var seenSeq = {};
+          btnDeployRun.disabled = true;
+          btnDeployRun.textContent = '⏳ Установка выполняется...';
+          statusBadge.textContent = 'Подключение по SSH...';
+          termLog.textContent =
+            '🚀 Запуск SSH-деплоя на ' +
+            wizardState.ssh.username + '@' + wizardState.ssh.host + ':' + wizardState.ssh.port + '\n' +
+            '📦 Конфигурация: ' + wizardState.config.webServer.toUpperCase() +
+            ' · ' + wizardState.config.domain +
+            ' · ' + wizardState.config.transport.toUpperCase() +
+            ' · Target ' + wizardState.config.target + '\n' +
+            '──────────────────────────────────────────────────────────\n';
+
+          function handleDeployEvent(ev) {
+            if (!ev || typeof ev !== 'object') return;
+            if (ev.seq && seenSeq[ev.seq]) return;
+            if (ev.seq) seenSeq[ev.seq] = true;
+
+            if (ev.type === 'step') {
+              if (ev.status === 'running') {
+                statusBadge.textContent = ev.title;
+                appendTermLine('\n▶ ' + ev.title + '...\n');
+              } else if (ev.status === 'success') {
+                appendTermLine('✅ ' + ev.title + (ev.detail ? ' [' + ev.detail + ']' : '') + '\n');
+              } else if (ev.status === 'error') {
+                statusBadge.textContent = '❌ Ошибка установки';
+                appendTermLine('\n❌ ' + ev.title + (ev.detail ? ': ' + ev.detail : '') + '\n');
+              }
+            } else if (ev.type === 'command') {
+              appendTermLine('$ ' + ev.command + '\n');
+            } else if (ev.type === 'output') {
+              appendTermLine(ev.text);
+            } else if (ev.type === 'complete') {
+              btnDeployRun.disabled = false;
+              btnDeployRun.textContent = '🚀 Установить';
+              if (activeEventSource) {
+                activeEventSource.close();
+                activeEventSource = null;
+              }
+              if (ev.ok) {
+                statusBadge.textContent = '✅ Установка успешно завершена';
+                appendTermLine('\n──────────────────────────────────────────────────────────\n');
+                appendTermLine('🎉 SelfSteal успешно развёрнут!\n');
+                if (ev.chosenStub) {
+                  appendTermLine('🎨 Заглушка: ' + ev.chosenStub + '\n');
+                }
+                if (ev.vlessUri) {
+                  appendTermLine('🔗 VLESS URI: ' + ev.vlessUri + '\n');
+                }
+                if (ev.streamSettingsJson) {
+                  appendTermLine('\n📖 Блок streamSettings для Xray:\n' + ev.streamSettingsJson + '\n');
+                  var cfgEl = document.getElementById('cfg-xray');
+                  if (cfgEl) cfgEl.textContent = ev.streamSettingsJson;
+                }
+              } else {
+                statusBadge.textContent = '❌ Ошибка деплоя';
+                appendTermLine('\n❌ Деплой завершился с ошибкой: ' + (ev.error || 'Неизвестная ошибка') + '\n');
+              }
+            }
+          }
+
+          /* 1. Connect EventSource to /api/deploy/stream */
+          if (typeof window.EventSource !== 'undefined') {
+            try {
+              activeEventSource = new EventSource('/api/deploy/stream');
+              activeEventSource.onmessage = function (msgEvent) {
+                try {
+                  var parsed = JSON.parse(msgEvent.data);
+                  handleDeployEvent(parsed);
+                } catch (e) {}
+              };
+            } catch (e) {}
+          }
+
+          /* 2. POST /api/deploy with { ssh, config } */
+          var payload = {
+            ssh: {
+              host: wizardState.ssh.host,
+              port: wizardState.ssh.port,
+              username: wizardState.ssh.username,
+              authType: wizardState.ssh.authType,
+              password: wizardState.ssh.authType === 'password' ? wizardState.ssh.password : undefined,
+              privateKey: wizardState.ssh.authType === 'privateKey' ? wizardState.ssh.privateKey : undefined
+            },
+            config: {
+              domain: wizardState.config.domain,
+              webServer: wizardState.config.webServer,
+              transport: wizardState.config.transport,
+              xhttpPath: wizardState.config.xhttpPath,
+              target: wizardState.config.target
+            }
+          };
+
+          fetch('/api/deploy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          })
+            .then(function (response) {
+              if (!response.ok) {
+                return response.json().then(function (errData) {
+                  throw new Error((errData && errData.error) || 'HTTP ' + response.status);
+                });
+              }
+              if (!response.body || !response.body.getReader) return;
+              var reader = response.body.getReader();
+              var decoder = new TextDecoder('utf-8');
+              var buffer = '';
+
+              function pump() {
+                return reader.read().then(function (res) {
+                  if (res.done) return;
+                  buffer += decoder.decode(res.value, { stream: true });
+                  var parts = buffer.split('\n\n');
+                  buffer = parts.pop() || '';
+                  parts.forEach(function (chunk) {
+                    var line = chunk.trim();
+                    if (line.indexOf('data:') === 0) {
+                      var jsonStr = line.replace(/^data:\s*/, '');
+                      try {
+                        handleDeployEvent(JSON.parse(jsonStr));
+                      } catch (e) {}
+                    }
+                  });
+                  return pump();
+                });
+              }
+              return pump();
+            })
+            .catch(function (err) {
+              btnDeployRun.disabled = false;
+              btnDeployRun.textContent = '🚀 Установить';
+              statusBadge.textContent = '❌ Ошибка соединения';
+              appendTermLine('\n❌ Ошибка запроса POST /api/deploy: ' + (err && err.message ? err.message : String(err)) + '\n');
+              if (activeEventSource) {
+                activeEventSource.close();
+                activeEventSource = null;
+              }
+            });
+        });
+      })();
+    </script>
   </body>
 </html>
-

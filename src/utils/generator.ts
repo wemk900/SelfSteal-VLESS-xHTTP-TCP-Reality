@@ -2585,5 +2585,49 @@ ${generateXrayConfig(config)}
 `;
 }
 
+/**
+ * Normalizes a partial config from the 3-step SSH Deploy wizard into a full SelfStealConfig
+ */
+export function normalizeIncomingDeployConfig(
+  raw: Partial<SelfStealConfig> & { targetPort?: string | number } = {}
+): SelfStealConfig {
+  const creds = generateRealityCredentials();
+  const rawDomain =
+    (raw.domain || 'poland.example.xyz')
+      .trim()
+      .replace(/^https?:\/\//i, '')
+      .split('/')[0] || 'poland.example.xyz';
+  const webServer = raw.webServer === 'nginx' ? 'nginx' : 'caddy';
+  const transport = raw.transport === 'tcp' ? 'tcp' : 'xhttp';
+  const rawTarget = String(raw.target || raw.targetPort || '127.0.0.1:9443').trim();
+  const { fullTarget } = normalizeTargetAddress(rawTarget);
+  const xhttpPath = normalizeXhttpPath(raw.xhttpPath || '/media/v3/chunk/', rawDomain);
+
+  return {
+    webServer,
+    domain: rawDomain,
+    transport,
+    xhttpPath,
+    target: fullTarget,
+    xhttpInternalPort: Number(raw.xhttpInternalPort) || 8080,
+    xrayInboundPort: Number(raw.xrayInboundPort) || 443,
+    serverIp: raw.serverIp || '185.212.140.42',
+    ipv6Address: raw.ipv6Address || '2a01:4f8:c012:3456::1',
+    acmeEmail: raw.acmeEmail || `admin@${rawDomain}`,
+    autoRenewCert: raw.autoRenewCert ?? true,
+    renewIntervalDays: Number(raw.renewIntervalDays) || 1,
+    enableAccessLog: raw.enableAccessLog ?? true,
+    enableErrorLog: raw.enableErrorLog ?? true,
+    logFormat: raw.logFormat === 'combined' ? 'combined' : 'json',
+    logRetentionDays: Number(raw.logRetentionDays) || 14,
+    camouflageTheme: raw.camouflageTheme || 'random',
+    uuid: raw.uuid || creds.uuid,
+    privateKey: raw.privateKey || creds.privateKey,
+    publicKey: raw.publicKey || creds.publicKey,
+    shortId: raw.shortId || creds.shortId,
+  };
+}
+
+
 
 
