@@ -418,7 +418,7 @@ export function App() {
   );
 
   const oneLinerCmd =
-    'bash <(curl -fsSL https://raw.githubusercontent.com/wemkk1/selfsteal-vless/main/install-selfsteal.sh)';
+    'bash <(curl -fsSL https://raw.githubusercontent.com/wemkk1/SelfSteal-VLESS-xHTTP-TCP-Reality/main/install-selfsteal.sh)';
 
   const handleCopyOneLiner = () => {
     navigator.clipboard.writeText(oneLinerCmd);
@@ -452,7 +452,7 @@ export function App() {
               <a href="#cli">{t.nav.cli}</a>
               <a href="#remnawave">{t.nav.remnawave}</a>
               <a
-                href="https://github.com/wemkk1/selfsteal-vless"
+                href="https://github.com/wemkk1/SelfSteal-VLESS-xHTTP-TCP-Reality"
                 target="_blank"
                 rel="noopener noreferrer"
               >

@@ -143,6 +143,7 @@ a {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .brand-badge {
@@ -159,6 +160,7 @@ a {
   color: var(--cyan);
   font-size: 0.95rem;
   box-shadow: 0 0 20px rgba(124, 58, 237, 0.2);
+  flex-shrink: 0;
 }
 
 .brand-title {
@@ -192,6 +194,7 @@ a {
   position: relative;
   padding: 4px 0;
   transition: color 0.2s ease, transform 0.2s ease;
+  white-space: nowrap;
 }
 
 .nav-links a:hover {
@@ -203,11 +206,13 @@ a {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .ctrl-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   padding: 7px 13px;
   border-radius: 9px;
@@ -219,6 +224,8 @@ a {
   font-weight: 700;
   cursor: pointer;
   transition: all 0.22s ease;
+  white-space: nowrap;
+  user-select: none;
 }
 
 .ctrl-btn:hover {
@@ -230,6 +237,76 @@ a {
 .ctrl-btn-badge {
   color: var(--cyan);
   font-weight: 800;
+}
+
+@media (max-width: 768px) {
+  .topbar-inner {
+    padding: 10px 0;
+    min-height: auto;
+    gap: 12px;
+  }
+
+  .nav-right {
+    width: 100%;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .nav-links {
+    gap: 12px;
+    font-size: 0.8rem;
+    overflow-x: auto;
+    max-width: 100%;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .nav-links::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .topbar-inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 8px 0 10px;
+  }
+
+  .topbar-inner .brand {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .nav-right {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .nav-links {
+    justify-content: flex-start;
+    overflow-x: auto;
+    width: 100%;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nav-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .ctrl-btn {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 0.76rem;
+    justify-content: center;
+  }
 }
 
 /* Hero */
